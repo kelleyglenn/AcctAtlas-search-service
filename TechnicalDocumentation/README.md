@@ -51,6 +51,12 @@ The Search Service provides full-text and faceted search capabilities across all
         "fields": { "keyword": { "type": "keyword" } }
       },
       "description": { "type": "text", "analyzer": "video_analyzer" },
+      "channelId": { "type": "keyword" },
+      "channelName": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "publishedAt": { "type": "date" },
       "amendments": { "type": "keyword" },
       "participants": { "type": "keyword" },
       "videoDate": { "type": "date" },
