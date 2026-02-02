@@ -1,0 +1,500 @@
+openapi: 3.1.0
+info:
+  title: AccountabilityAtlas Search Service API
+  version: 1.0.0
+  description: |
+    Full-text and faceted search for AccountabilityAtlas.
+    Provides search across video content with filtering, faceting,
+    and autocomplete suggestions.
+
+    ## Access Patterns
+    - **Public (via Gateway)**: `https://api.accountabilityatlas.com/api/v1/search/...`
+    - **Internal (service-to-service)**: `http://search-service:8084/search/...`
+
+    All search endpoints are public (no authentication required).
+  contact:
+    name: AccountabilityAtlas Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8084
+    description: Local development (direct)
+  - url: http://search-service:8084
+    description: Internal service mesh (Kubernetes/ECS service discovery)
+  - url: https://api.accountabilityatlas.com/api/v1
+    description: Production (via API Gateway)
+
+tags:
+  - name: Search
+    description: Search and discovery operations
+
+paths:
+  /search:
+    get:
+      operationId: searchVideos
+      summary: Search videos with full-text and filters
+      description: |
+        Execute a search query across video content.
+        Supports full-text search, faceted filtering, and geo-filtering.
+        Results are ranked by relevance with optional sorting.
+      tags: [Search]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 500
+          description: |
+            Search query text. Searches title, description, and channel name.
+            Supports synonyms (e.g., "cop" matches "police", "1a" matches "first amendment").
+          example: "first amendment audit police station"
+        - name: amendments
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [FIRST, SECOND, FOURTH, FIFTH]
+          style: form
+          explode: true
+          description: Filter by amendments (OR logic within, AND with other filters)
+        - name: participants
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN]
+          style: form
+          explode: true
+          description: Filter by participant types
+        - name: channelId
+          in: query
+          schema:
+            type: string
+            maxLength: 50
+          description: Filter by YouTube channel ID
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter videos from this date (inclusive)
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter videos until this date (inclusive)
+        - name: state
+          in: query
+          schema:
+            type: string
+            maxLength: 50
+          description: Filter by US state
+          example: "California"
+        - name: bbox
+          in: query
+          schema:
+            type: string
+            pattern: "^-?\\d+\\.?\\d*,-?\\d+\\.?\\d*,-?\\d+\\.?\\d*,-?\\d+\\.?\\d*$"
+          description: "Geo filter: minLng,minLat,maxLng,maxLat"
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, date, distance]
+            default: relevance
+          description: |
+            Sort order:
+            - `relevance`: Best match first (default)
+            - `date`: Most recent first
+            - `distance`: Nearest first (requires bbox or geo context)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /search/suggest:
+    get:
+      operationId: getSuggestions
+      summary: Get autocomplete suggestions
+      description: |
+        Returns autocomplete suggestions for search queries.
+        Used for search-as-you-type functionality.
+      tags: [Search]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+          description: Partial search query (minimum 2 characters)
+          example: "first amend"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+          description: Maximum number of suggestions
+      responses:
+        '200':
+          description: Autocomplete suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuggestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /search/facets:
+    get:
+      operationId: getFacets
+      summary: Get available facet values
+      description: |
+        Returns available filter values with counts.
+        Useful for building filter UI with accurate counts.
+      tags: [Search]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 500
+          description: Optional search query to scope facet counts
+        - name: amendments
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [FIRST, SECOND, FOURTH, FIFTH]
+          style: form
+          explode: true
+        - name: participants
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN]
+          style: form
+          explode: true
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Facet values with counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacetsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  schemas:
+    # Search result objects
+    VideoSearchResult:
+      type: object
+      required: [id, youtubeId, title, amendments, participants, score]
+      properties:
+        id:
+          type: string
+          format: uuid
+        youtubeId:
+          type: string
+          maxLength: 20
+        title:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          format: uri
+          maxLength: 500
+        durationSeconds:
+          type: integer
+          nullable: true
+        channelId:
+          type: string
+          maxLength: 50
+          nullable: true
+        channelName:
+          type: string
+          maxLength: 255
+          nullable: true
+        videoDate:
+          type: string
+          format: date
+          nullable: true
+        amendments:
+          type: array
+          items:
+            type: string
+            enum: [FIRST, SECOND, FOURTH, FIFTH]
+        participants:
+          type: array
+          items:
+            type: string
+            enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN]
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationSummary'
+        score:
+          type: number
+          format: float
+          description: Relevance score (higher = better match)
+        highlights:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Field highlights with <em> tags around matches
+          examples:
+            - title: ["<em>First Amendment</em> Audit at City Hall"]
+              description: ["...the <em>police</em> officer approached..."]
+        createdAt:
+          type: string
+          format: date-time
+
+    LocationSummary:
+      type: object
+      required: [id, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          maxLength: 200
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        state:
+          type: string
+          maxLength: 50
+          nullable: true
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+
+    Coordinates:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+
+    SearchFacets:
+      type: object
+      properties:
+        amendments:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count per amendment type
+          examples:
+            - FIRST: 1234
+              FOURTH: 567
+              SECOND: 89
+              FIFTH: 45
+        participants:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count per participant type
+          examples:
+            - POLICE: 2000
+              GOVERNMENT: 800
+              CITIZEN: 1500
+              BUSINESS: 200
+        states:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count per US state
+          examples:
+            - California: 500
+              Texas: 350
+              Florida: 280
+        years:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count per year
+          examples:
+            - "2025": 150
+              "2024": 800
+              "2023": 600
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelFacet'
+          description: Top channels by video count
+
+    ChannelFacet:
+      type: object
+      properties:
+        channelId:
+          type: string
+        channelName:
+          type: string
+        count:
+          type: integer
+
+    Suggestion:
+      type: object
+      required: [text, score]
+      properties:
+        text:
+          type: string
+          description: Suggested completion
+        score:
+          type: number
+          format: float
+          description: Suggestion relevance score
+        category:
+          type: string
+          enum: [query, channel, location]
+          description: Type of suggestion
+
+    # Response schemas
+    SearchResponse:
+      type: object
+      required: [results, facets, pagination, queryTime]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoSearchResult'
+        facets:
+          $ref: '#/components/schemas/SearchFacets'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        queryTime:
+          type: integer
+          description: Query execution time in milliseconds
+          examples: [42]
+        query:
+          type: string
+          description: Echo of the search query
+
+    Pagination:
+      type: object
+      required: [page, size, totalElements, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+
+    SuggestResponse:
+      type: object
+      required: [suggestions]
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Suggestion'
+        query:
+          type: string
+          description: Echo of the input query
+
+    FacetsResponse:
+      type: object
+      required: [facets]
+      properties:
+        facets:
+          $ref: '#/components/schemas/SearchFacets'
+        totalMatching:
+          type: integer
+          description: Total documents matching current filters
+
+    # Error schemas
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+        traceId:
+          type: string
+          format: uuid
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: VALIDATION_ERROR
+            message: Request validation failed
+            details:
+              - field: q
+                message: Search query exceeds maximum length of 500 characters
+            traceId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"

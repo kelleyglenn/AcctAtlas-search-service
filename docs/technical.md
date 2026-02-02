@@ -32,7 +32,7 @@ The Search Service provides full-text and faceted search capabilities across all
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [api-specification.yaml](api-specification.yaml) | Planned | OpenAPI 3.0 specification |
+| [api-specification.yaml](api-specification.yaml) | Complete | OpenAPI 3.1 specification |
 | [index-mapping.md](index-mapping.md) | Planned | OpenSearch index configuration |
 | [query-patterns.md](query-patterns.md) | Planned | Search query implementations |
 | [relevance-tuning.md](relevance-tuning.md) | Planned | Ranking and scoring rules |
