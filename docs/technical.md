@@ -17,7 +17,7 @@ The Search Service provides full-text and faceted search capabilities across all
 
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.2.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build | Gradle |
 | Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch 2.x (Phase 3+) |
