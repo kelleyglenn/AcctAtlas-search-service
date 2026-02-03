@@ -2,16 +2,16 @@
 
 ## Service Overview
 
-The Search Service provides full-text and faceted search capabilities across all video content in AccountabilityAtlas. It maintains a search index synchronized with the video database and provides fast, relevance-ranked results.
+The Search Service provides full-text and faceted search capabilities across all video content in AccountabilityAtlas. It uses a pluggable search backend — PostgreSQL FTS in Phases 1-2, OpenSearch in Phase 3+ — and provides fast, relevance-ranked results.
 
 ## Responsibilities
 
-- Index video documents from database events
-- Execute full-text search queries
+- Execute full-text search queries with weighted ranking (title > channel > description)
 - Provide faceted filtering (amendments, participants, location, date)
-- Autocomplete suggestions
+- Autocomplete suggestions (Phase 1-2: prefix matching via SQL `LIKE`; Phase 3+: OpenSearch completion suggester)
 - Search result ranking and relevance tuning
-- Synonym handling for common terms
+- Synonym handling for common terms (e.g., "1A" → "First Amendment", "cop" → "police")
+- Index video documents from SQS events (Phase 3+: OpenSearch indexing; Phase 1-2: handled by PostgreSQL trigger)
 
 ## Technology Stack
 
@@ -20,12 +20,25 @@ The Search Service provides full-text and faceted search capabilities across all
 | Framework | Spring Boot 3.2.x |
 | Language | Java 21 |
 | Build | Gradle |
-| Search Engine | OpenSearch 2.x |
-| Client | OpenSearch Java Client |
+| Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch 2.x (Phase 3+) |
+| Client | Spring Data JPA (Phase 1-2), OpenSearch Java Client (Phase 3+) |
+
+## Architecture
+
+The search backend is abstracted behind a `SearchRepository` interface:
+
+```
+SearchRepository (interface)
+├── PostgresSearchRepository  — active in Phase 1-2 (Spring profile: "fts")
+└── OpenSearchRepository      — active in Phase 3+  (Spring profile: "opensearch")
+```
+
+The active implementation is selected via Spring profile (`spring.profiles.active=fts` or `spring.profiles.active=opensearch`). Both implementations expose the same search, suggest, and facet operations through the API endpoints below.
 
 ## Dependencies
 
-- **OpenSearch**: Search index storage and querying
+- **PostgreSQL** (Phase 1-2): Search queries via `tsvector`/`tsquery` against the `content.videos` table
+- **OpenSearch** (Phase 3+): Dedicated search index storage and querying
 - **SQS**: Event consumption (VideoApproved, VideoUpdated, VideoDeleted)
 
 ## Documentation Index
@@ -33,11 +46,19 @@ The Search Service provides full-text and faceted search capabilities across all
 | Document | Status | Description |
 |----------|--------|-------------|
 | [api-specification.yaml](api-specification.yaml) | Complete | OpenAPI 3.1 specification |
-| [index-mapping.md](index-mapping.md) | Planned | OpenSearch index configuration |
-| [query-patterns.md](query-patterns.md) | Planned | Search query implementations |
+| [index-mapping.md](index-mapping.md) | Planned | OpenSearch index configuration (Phase 3+) |
+| [query-patterns.md](query-patterns.md) | Planned | Search query implementations (both backends) |
 | [relevance-tuning.md](relevance-tuning.md) | Planned | Ranking and scoring rules |
 
 ## Search Index Schema
+
+### Phase 1-2: PostgreSQL FTS
+
+Search is powered by a `search_vector tsvector` column on `content.videos` with a GIN index. Weighted ranking: title (A), channel_name (B), description (C). A custom `acct_atlas` text search configuration provides domain-specific synonyms.
+
+See [05-DataArchitecture.md](../../../docs/05-DataArchitecture.md#full-text-search-configuration-phase-1-2) for full DDL, trigger definition, and example queries.
+
+### Phase 3+: OpenSearch Index
 
 ```json
 {
@@ -146,18 +167,28 @@ synonyms:
 
 ## Events Consumed
 
-| Event | Action |
-|-------|--------|
-| VideoApproved | Index new document |
-| VideoUpdated | Update existing document |
-| VideoDeleted | Remove document from index |
+| Event | Phase 1-2 Action | Phase 3+ Action |
+|-------|------------------|-----------------|
+| VideoApproved | No action (tsvector trigger handles indexing) | Index new document in OpenSearch |
+| VideoUpdated | No action (tsvector trigger handles updates) | Update existing document in OpenSearch |
+| VideoDeleted | No action (CASCADE delete removes row) | Remove document from OpenSearch |
 
 ## Reindexing
 
-Full reindex capability for:
-- Schema changes
-- Analyzer updates
-- Disaster recovery
+### Phase 1-2 (PostgreSQL FTS)
+
+Reindex by regenerating the `search_vector` column:
+
+```sql
+UPDATE content.videos SET search_vector =
+    setweight(to_tsvector('acct_atlas', COALESCE(title, '')), 'A') ||
+    setweight(to_tsvector('acct_atlas', COALESCE(channel_name, '')), 'B') ||
+    setweight(to_tsvector('acct_atlas', COALESCE(description, '')), 'C');
+```
+
+### Phase 3+ (OpenSearch)
+
+Full reindex capability for schema changes, analyzer updates, and disaster recovery:
 
 ```bash
 # Trigger reindex via admin endpoint
@@ -171,14 +202,15 @@ Authorization: Bearer <admin_token>
 ## Local Development
 
 ```bash
-# Start dependencies
-docker-compose up -d opensearch
+# Phase 1-2: Start with PostgreSQL FTS (default)
+docker-compose up -d postgres
+./gradlew bootRun --args='--spring.profiles.active=local,fts'
 
+# Phase 3+: Start with OpenSearch
+docker-compose up -d postgres opensearch
 # Wait for OpenSearch to be ready
 curl -s http://localhost:9200/_cluster/health | jq .status
-
-# Run service
-./gradlew bootRun
+./gradlew bootRun --args='--spring.profiles.active=local,opensearch'
 
 # Service available at http://localhost:8084
 ```

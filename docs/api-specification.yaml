@@ -21,7 +21,7 @@ servers:
   - url: http://localhost:8084
     description: Local development (direct)
   - url: http://search-service:8084
-    description: Internal service mesh (Kubernetes/ECS service discovery)
+    description: Internal service mesh (Docker Compose Phase 1, ECS service discovery Phase 2+)
   - url: https://api.accountabilityatlas.com/api/v1
     description: Production (via API Gateway)
 
