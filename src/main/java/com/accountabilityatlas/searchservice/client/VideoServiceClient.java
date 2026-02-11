@@ -67,15 +67,12 @@ public class VideoServiceClient {
       throw new VideoServiceException(
           videoId, "Video-service error: " + e.getStatusCode(), e, retryable);
 
-    } catch (VideoNotFoundException e) {
+    } catch (VideoNotFoundException | VideoServiceException e) {
       // Re-throw VideoNotFoundException (from null check above) without wrapping
-      throw e;
-
-    } catch (VideoServiceException e) {
       // Re-throw VideoServiceException without wrapping
       throw e;
 
-    } catch (Exception e) {
+    }  catch (Exception e) {
       log.error("Unexpected error fetching video {}: {}", videoId, e.getMessage());
       throw new VideoServiceException(videoId, "Unexpected error fetching video", e, true);
     }

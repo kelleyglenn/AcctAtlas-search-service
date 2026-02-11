@@ -45,21 +45,24 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_whenVideoNotFound_skipsIndexing() {
+    // Arrange
     when(videoServiceClient.getVideo(videoId)).thenThrow(new VideoNotFoundException(videoId));
 
-    // Should not throw - VideoNotFoundException is handled gracefully
+    // Act
     indexingService.indexVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository, never()).save(any());
   }
 
   @Test
   void indexVideo_whenVideoServiceUnavailable_propagatesException() {
+    // Arrange
     VideoServiceException serviceException =
         new VideoServiceException(videoId, "Service unavailable", true);
     when(videoServiceClient.getVideo(videoId)).thenThrow(serviceException);
 
-    // Should propagate to trigger retry/DLQ
+    // Act & Assert
     assertThatThrownBy(() -> indexingService.indexVideo(videoId))
         .isInstanceOf(VideoServiceException.class)
         .satisfies(
@@ -73,21 +76,27 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_whenVideoNotApproved_skipsIndexing() {
+    // Arrange
     VideoDetail pendingVideo = createVideoDetail(videoId, "PENDING");
     when(videoServiceClient.getVideo(videoId)).thenReturn(pendingVideo);
 
+    // Act
     indexingService.indexVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository, never()).save(any());
   }
 
   @Test
   void indexVideo_whenApproved_savesNewVideo() {
+    // Arrange
     when(videoServiceClient.getVideo(videoId)).thenReturn(approvedVideo);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.empty());
 
+    // Act
     indexingService.indexVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository).save(searchVideoCaptor.capture());
     SearchVideo saved = searchVideoCaptor.getValue();
 
@@ -103,6 +112,7 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_whenApproved_updatesExistingVideo() {
+    // Arrange
     SearchVideo existing = new SearchVideo();
     existing.setId(videoId);
     existing.setTitle("Old Title");
@@ -110,8 +120,10 @@ class IndexingServiceTest {
     when(videoServiceClient.getVideo(videoId)).thenReturn(approvedVideo);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.of(existing));
 
+    // Act
     indexingService.indexVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository).save(searchVideoCaptor.capture());
     SearchVideo saved = searchVideoCaptor.getValue();
 
@@ -121,14 +133,17 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_withPrimaryLocation_mapsLocationData() {
+    // Arrange
     UUID locationId = UUID.randomUUID();
     VideoDetail videoWithLocation = createVideoDetailWithLocation(videoId, locationId);
 
     when(videoServiceClient.getVideo(videoId)).thenReturn(videoWithLocation);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.empty());
 
+    // Act
     indexingService.indexVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository).save(searchVideoCaptor.capture());
     SearchVideo saved = searchVideoCaptor.getValue();
 
@@ -142,6 +157,7 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_withNullAmendments_setsEmptyArray() {
+    // Arrange
     VideoDetail videoWithNulls =
         new VideoDetail(
             videoId,
@@ -153,8 +169,8 @@ class IndexingServiceTest {
             null,
             null,
             null,
-            null, // null amendments
-            null, // null participants
+            null,
+            null,
             "APPROVED",
             OffsetDateTime.now(ZoneOffset.UTC),
             null);
@@ -162,8 +178,10 @@ class IndexingServiceTest {
     when(videoServiceClient.getVideo(videoId)).thenReturn(videoWithNulls);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.empty());
 
+    // Act
     indexingService.indexVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository).save(searchVideoCaptor.capture());
     SearchVideo saved = searchVideoCaptor.getValue();
 
@@ -173,19 +191,25 @@ class IndexingServiceTest {
 
   @Test
   void removeVideo_whenExists_deletesVideo() {
+    // Arrange
     when(searchVideoRepository.existsById(videoId)).thenReturn(true);
 
+    // Act
     indexingService.removeVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository).deleteById(videoId);
   }
 
   @Test
   void removeVideo_whenNotExists_doesNothing() {
+    // Arrange
     when(searchVideoRepository.existsById(videoId)).thenReturn(false);
 
+    // Act
     indexingService.removeVideo(videoId);
 
+    // Assert
     verify(searchVideoRepository, never()).deleteById(any());
   }
 

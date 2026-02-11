@@ -50,12 +50,15 @@ class SearchServiceTest {
 
   @Test
   void search_withQueryOnly_passesQueryToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(testVideo), pageable, 1);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     SearchResult result = searchService.search("test query", null, null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(
             queryCaptor.capture(),
@@ -74,12 +77,15 @@ class SearchServiceTest {
 
   @Test
   void search_withBlankQuery_passesNullToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search("   ", null, null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(queryCaptor.capture(), any(), any(), any(), eq(pageable));
 
@@ -88,12 +94,15 @@ class SearchServiceTest {
 
   @Test
   void search_withNullQuery_passesNullToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, null, null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(queryCaptor.capture(), any(), any(), any(), eq(pageable));
 
@@ -102,12 +111,15 @@ class SearchServiceTest {
 
   @Test
   void search_withAmendments_convertsToPostgresArray() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, Set.of("FIRST", "FOURTH"), null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
 
@@ -118,12 +130,15 @@ class SearchServiceTest {
 
   @Test
   void search_withParticipants_convertsToPostgresArray() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, null, Set.of("POLICE", "CITIZEN"), null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
 
@@ -134,12 +149,15 @@ class SearchServiceTest {
 
   @Test
   void search_withEmptyAmendments_passesNullToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, Set.of(), null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
 
@@ -148,12 +166,15 @@ class SearchServiceTest {
 
   @Test
   void search_withState_passesStateToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, null, null, "TX", pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), any(), any(), stateCaptor.capture(), eq(pageable));
 
@@ -162,6 +183,7 @@ class SearchServiceTest {
 
   @Test
   void search_returnsCorrectPaginationInfo() {
+    // Arrange
     SearchVideo video1 = new SearchVideo();
     video1.setId(UUID.randomUUID());
     SearchVideo video2 = new SearchVideo();
@@ -172,8 +194,10 @@ class SearchServiceTest {
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     SearchResult result = searchService.search("test", null, null, null, page1);
 
+    // Assert
     assertThat(result.videos()).hasSize(2);
     assertThat(result.totalElements()).isEqualTo(25);
     assertThat(result.totalPages()).isEqualTo(3);
@@ -183,23 +207,29 @@ class SearchServiceTest {
 
   @Test
   void search_recordsQueryTime() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     SearchResult result = searchService.search("test", null, null, null, pageable);
 
+    // Assert
     assertThat(result.queryTimeMs()).isGreaterThanOrEqualTo(0);
   }
 
   @Test
   void search_trimsQueryWhitespace() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search("  test query  ", null, null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(queryCaptor.capture(), any(), any(), any(), eq(pageable));
 
@@ -208,13 +238,15 @@ class SearchServiceTest {
 
   @Test
   void search_withInvalidAmendments_filtersOutInvalidValues() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
-    // Include invalid value that could be SQL injection attempt
+    // Act
     searchService.search(null, Set.of("FIRST", "INVALID", "};DROP TABLE--"), null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
 
@@ -225,12 +257,15 @@ class SearchServiceTest {
 
   @Test
   void search_withAllInvalidAmendments_passesNullToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, Set.of("INVALID", "ALSO_INVALID"), null, null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
 
@@ -239,12 +274,15 @@ class SearchServiceTest {
 
   @Test
   void search_withInvalidParticipants_filtersOutInvalidValues() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, null, Set.of("POLICE", "HACKER", "},{bad}"), null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
 
@@ -255,12 +293,15 @@ class SearchServiceTest {
 
   @Test
   void search_withAllInvalidParticipants_passesNullToRepository() {
+    // Arrange
     Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
     when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
         .thenReturn(page);
 
+    // Act
     searchService.search(null, null, Set.of("NOT_A_PARTICIPANT"), null, pageable);
 
+    // Assert
     verify(searchVideoRepository)
         .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
 

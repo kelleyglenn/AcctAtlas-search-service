@@ -20,26 +20,32 @@ class ModerationEventHandlersTest {
 
   @Test
   void handleVideoApproved_callsIndexVideo() {
+    // Arrange
     UUID videoId = UUID.randomUUID();
     VideoApprovedEvent event =
         new VideoApprovedEvent("VideoApproved", videoId, UUID.randomUUID(), Instant.now());
 
+    // Act
     Consumer<VideoApprovedEvent> handler = handlers.handleVideoApproved();
     handler.accept(event);
 
+    // Assert
     verify(indexingService).indexVideo(videoId);
   }
 
   @Test
   void handleVideoRejected_callsRemoveVideo() {
+    // Arrange
     UUID videoId = UUID.randomUUID();
     VideoRejectedEvent event =
         new VideoRejectedEvent(
             "VideoRejected", videoId, UUID.randomUUID(), "OFF_TOPIC", null, Instant.now());
 
+    // Act
     Consumer<VideoRejectedEvent> handler = handlers.handleVideoRejected();
     handler.accept(event);
 
+    // Assert
     verify(indexingService).removeVideo(videoId);
   }
 }

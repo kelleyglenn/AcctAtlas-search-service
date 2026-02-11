@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,7 +41,7 @@ public class SearchController {
 
     SearchResponse response =
         new SearchResponse(
-            result.videos().stream().map(this::toVideoResult).collect(Collectors.toList()),
+            result.videos().stream().map(this::toVideoResult).toList(),
             new Pagination(
                 result.page(), result.size(), result.totalElements(), result.totalPages()),
             result.queryTimeMs(),

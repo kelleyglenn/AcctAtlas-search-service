@@ -53,11 +53,14 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenVideoExists_returnsVideo() {
+    // Arrange
     VideoDetail expectedVideo = createTestVideo(videoId);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.just(expectedVideo));
 
+    // Act
     VideoDetail result = videoServiceClient.getVideo(videoId);
 
+    // Assert
     assertThat(result.id()).isEqualTo(videoId);
     assertThat(result.title()).isEqualTo("Test Video");
     assertThat(result.status()).isEqualTo("APPROVED");
@@ -65,10 +68,12 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenVideoNotFound_throwsVideoNotFoundException() {
+    // Arrange
     WebClientResponseException notFound =
         WebClientResponseException.create(404, "Not Found", null, null, null);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(notFound));
 
+    // Act & Assert
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
         .isInstanceOf(VideoNotFoundException.class)
         .hasMessageContaining(videoId.toString());
@@ -76,10 +81,12 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenServerError_throwsRetryableVideoServiceException() {
+    // Arrange
     WebClientResponseException serverError =
         WebClientResponseException.create(500, "Internal Server Error", null, null, null);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(serverError));
 
+    // Act & Assert
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
         .isInstanceOf(VideoServiceException.class)
         .satisfies(
@@ -92,11 +99,13 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenServiceUnavailable_throwsRetryableVideoServiceException() {
+    // Arrange
     WebClientResponseException unavailable =
         WebClientResponseException.create(
             HttpStatus.SERVICE_UNAVAILABLE.value(), "Service Unavailable", null, null, null);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(unavailable));
 
+    // Act & Assert
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
         .isInstanceOf(VideoServiceException.class)
         .satisfies(
@@ -109,6 +118,7 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenConnectionError_throwsRetryableVideoServiceException() {
+    // Arrange
     WebClientRequestException connectionError =
         new WebClientRequestException(
             new RuntimeException("Connection refused"),
@@ -117,6 +127,7 @@ class VideoServiceClientTest {
             HttpHeaders.EMPTY);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(connectionError));
 
+    // Act & Assert
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
         .isInstanceOf(VideoServiceException.class)
         .satisfies(
@@ -129,10 +140,12 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenBadRequest_throwsNonRetryableVideoServiceException() {
+    // Arrange
     WebClientResponseException badRequest =
         WebClientResponseException.create(400, "Bad Request", null, null, null);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(badRequest));
 
+    // Act & Assert
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
         .isInstanceOf(VideoServiceException.class)
         .satisfies(
@@ -144,8 +157,10 @@ class VideoServiceClientTest {
 
   @Test
   void getVideo_whenResponseIsNull_throwsVideoNotFoundException() {
+    // Arrange
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.empty());
 
+    // Act & Assert
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
         .isInstanceOf(VideoNotFoundException.class);
   }

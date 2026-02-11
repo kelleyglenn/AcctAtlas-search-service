@@ -16,23 +16,6 @@ public interface SearchVideoRepository extends JpaRepository<SearchVideo, UUID> 
           """
           SELECT v.*, ts_rank_cd(v.search_vector, plainto_tsquery('english', :query)) AS rank
           FROM search.search_videos v
-          WHERE v.search_vector @@ plainto_tsquery('english', :query)
-          ORDER BY rank DESC
-          """,
-      countQuery =
-          """
-          SELECT COUNT(*)
-          FROM search.search_videos v
-          WHERE v.search_vector @@ plainto_tsquery('english', :query)
-          """,
-      nativeQuery = true)
-  Page<SearchVideo> searchByQuery(String query, Pageable pageable);
-
-  @Query(
-      value =
-          """
-          SELECT v.*, ts_rank_cd(v.search_vector, plainto_tsquery('english', :query)) AS rank
-          FROM search.search_videos v
           WHERE (:query IS NULL OR :query = '' OR v.search_vector @@ plainto_tsquery('english', :query))
             AND (:amendments IS NULL OR v.amendments && CAST(:amendments AS VARCHAR[]))
             AND (:participants IS NULL OR v.participants && CAST(:participants AS VARCHAR[]))

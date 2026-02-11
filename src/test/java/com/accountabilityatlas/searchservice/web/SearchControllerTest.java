@@ -51,8 +51,10 @@ class SearchControllerTest {
 
   @Test
   void search_returnsOkWithEmptyResults() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act & Assert
     mockMvc
         .perform(get("/search"))
         .andExpect(status().isOk())
@@ -63,18 +65,23 @@ class SearchControllerTest {
 
   @Test
   void search_withQuery_passesQueryToService() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc.perform(get("/search").param("q", "police audit")).andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(eq("police audit"), any(), any(), any(), any());
   }
 
   @Test
   void search_withResults_returnsVideoData() throws Exception {
+    // Arrange
     SearchResult result = new SearchResult(List.of(testVideo), 1, 1, 0, 20, 10);
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
 
+    // Act & Assert
     mockMvc
         .perform(get("/search").param("q", "test"))
         .andExpect(status().isOk())
@@ -90,45 +97,57 @@ class SearchControllerTest {
 
   @Test
   void search_withAmendmentsFilter_passesAmendmentsToService() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc
         .perform(get("/search").param("amendments", "FIRST").param("amendments", "FOURTH"))
         .andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(any(), amendmentsCaptor.capture(), any(), any(), any());
     assertThat(amendmentsCaptor.getValue()).containsExactlyInAnyOrder("FIRST", "FOURTH");
   }
 
   @Test
   void search_withParticipantsFilter_passesParticipantsToService() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc
         .perform(get("/search").param("participants", "POLICE").param("participants", "CITIZEN"))
         .andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(any(), any(), participantsCaptor.capture(), any(), any());
     assertThat(participantsCaptor.getValue()).containsExactlyInAnyOrder("POLICE", "CITIZEN");
   }
 
   @Test
   void search_withStateFilter_passesStateToService() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc.perform(get("/search").param("state", "TX")).andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(any(), any(), any(), eq("TX"), any());
   }
 
   @Test
   void search_withPagination_passesPageableToService() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc
         .perform(get("/search").param("page", "2").param("size", "50"))
         .andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
     Pageable pageable = pageableCaptor.getValue();
     assertThat(pageable.getPageNumber()).isEqualTo(2);
@@ -137,20 +156,26 @@ class SearchControllerTest {
 
   @Test
   void search_withSizeOver100_capsAt100() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc.perform(get("/search").param("size", "200")).andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
     assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
   }
 
   @Test
   void search_withDefaultPagination_usesDefaults() throws Exception {
+    // Arrange
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
 
+    // Act
     mockMvc.perform(get("/search")).andExpect(status().isOk());
 
+    // Assert
     verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
     Pageable pageable = pageableCaptor.getValue();
     assertThat(pageable.getPageNumber()).isEqualTo(0);
@@ -159,10 +184,12 @@ class SearchControllerTest {
 
   @Test
   void search_withLocation_returnsLocationData() throws Exception {
+    // Arrange
     SearchVideo videoWithLocation = createTestVideoWithLocation();
     SearchResult result = new SearchResult(List.of(videoWithLocation), 1, 1, 0, 20, 5);
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
 
+    // Act & Assert
     mockMvc
         .perform(get("/search"))
         .andExpect(status().isOk())
@@ -175,9 +202,11 @@ class SearchControllerTest {
 
   @Test
   void search_withNoLocation_returnsEmptyLocationsArray() throws Exception {
+    // Arrange
     SearchResult result = new SearchResult(List.of(testVideo), 1, 1, 0, 20, 5);
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
 
+    // Act & Assert
     mockMvc
         .perform(get("/search"))
         .andExpect(status().isOk())
@@ -187,6 +216,7 @@ class SearchControllerTest {
 
   @Test
   void search_withNullAmendmentsInVideo_returnsEmptySet() throws Exception {
+    // Arrange
     SearchVideo videoNullArrays = new SearchVideo();
     videoNullArrays.setId(UUID.randomUUID());
     videoNullArrays.setYoutubeId("xyz789");
@@ -197,6 +227,7 @@ class SearchControllerTest {
     SearchResult result = new SearchResult(List.of(videoNullArrays), 1, 1, 0, 20, 5);
     when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
 
+    // Act & Assert
     mockMvc
         .perform(get("/search"))
         .andExpect(status().isOk())

@@ -1,11 +1,14 @@
 package com.accountabilityatlas.searchservice.client;
 
+import lombok.Getter;
+
 import java.util.UUID;
 
 /**
  * Thrown when video-service is unavailable or returns an unexpected error. This is retryable - the
  * message should be sent to DLQ for later processing.
  */
+@Getter
 public class VideoServiceException extends RuntimeException {
 
   private final UUID videoId;
@@ -23,11 +26,4 @@ public class VideoServiceException extends RuntimeException {
     this.retryable = retryable;
   }
 
-  public UUID getVideoId() {
-    return videoId;
-  }
-
-  public boolean isRetryable() {
-    return retryable;
-  }
 }
