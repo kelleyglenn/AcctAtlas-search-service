@@ -35,8 +35,7 @@ public class IndexingService {
       return;
     }
 
-    SearchVideo searchVideo =
-        searchVideoRepository.findById(videoId).orElseGet(SearchVideo::new);
+    SearchVideo searchVideo = searchVideoRepository.findById(videoId).orElseGet(SearchVideo::new);
 
     mapVideoToSearchVideo(video, searchVideo);
     searchVideoRepository.save(searchVideo);
@@ -67,9 +66,7 @@ public class IndexingService {
     searchVideo.setAmendments(
         video.amendments() != null ? video.amendments().toArray(new String[0]) : new String[0]);
     searchVideo.setParticipants(
-        video.participants() != null
-            ? video.participants().toArray(new String[0])
-            : new String[0]);
+        video.participants() != null ? video.participants().toArray(new String[0]) : new String[0]);
     searchVideo.setIndexedAt(Instant.now());
 
     // Find primary location

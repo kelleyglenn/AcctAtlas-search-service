@@ -15,8 +15,7 @@ public class VideoServiceClient {
   private final WebClient webClient;
 
   public VideoServiceClient(
-      WebClient.Builder webClientBuilder,
-      @Value("${app.video-service.base-url}") String baseUrl) {
+      WebClient.Builder webClientBuilder, @Value("${app.video-service.base-url}") String baseUrl) {
     this.webClient = webClientBuilder.baseUrl(baseUrl).build();
   }
 
