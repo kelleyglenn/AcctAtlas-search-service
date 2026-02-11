@@ -178,7 +178,7 @@ class SearchControllerTest {
     // Assert
     verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
     Pageable pageable = pageableCaptor.getValue();
-    assertThat(pageable.getPageNumber()).isEqualTo(0);
+    assertThat(pageable.getPageNumber()).isZero();
     assertThat(pageable.getPageSize()).isEqualTo(20);
   }
 

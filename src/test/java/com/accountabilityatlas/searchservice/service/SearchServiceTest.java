@@ -124,8 +124,7 @@ class SearchServiceTest {
         .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
 
     String amendments = amendmentsCaptor.getValue();
-    assertThat(amendments).startsWith("{").endsWith("}");
-    assertThat(amendments).contains("FIRST").contains("FOURTH");
+    assertThat(amendments).startsWith("{").contains("FIRST").contains("FOURTH").endsWith("}");
   }
 
   @Test
@@ -143,8 +142,7 @@ class SearchServiceTest {
         .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
 
     String participants = participantsCaptor.getValue();
-    assertThat(participants).startsWith("{").endsWith("}");
-    assertThat(participants).contains("POLICE").contains("CITIZEN");
+    assertThat(participants).startsWith("{").contains("POLICE").contains("CITIZEN").endsWith("}");
   }
 
   @Test
@@ -251,8 +249,7 @@ class SearchServiceTest {
         .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
 
     String amendments = amendmentsCaptor.getValue();
-    assertThat(amendments).isEqualTo("{FIRST}");
-    assertThat(amendments).doesNotContain("INVALID").doesNotContain("DROP");
+    assertThat(amendments).isEqualTo("{FIRST}").doesNotContain("INVALID").doesNotContain("DROP");
   }
 
   @Test
@@ -287,8 +284,7 @@ class SearchServiceTest {
         .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
 
     String participants = participantsCaptor.getValue();
-    assertThat(participants).isEqualTo("{POLICE}");
-    assertThat(participants).doesNotContain("HACKER").doesNotContain("bad");
+    assertThat(participants).isEqualTo("{POLICE}").doesNotContain("HACKER").doesNotContain("bad");
   }
 
   @Test

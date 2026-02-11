@@ -28,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class SearchIntegrationTest {
 
   @Container
+  @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
       new PostgreSQLContainer<>("postgres:15-alpine")
           .withDatabaseName("search")

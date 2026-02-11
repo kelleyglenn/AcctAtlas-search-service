@@ -1,8 +1,7 @@
 package com.accountabilityatlas.searchservice.client;
 
-import lombok.Getter;
-
 import java.util.UUID;
+import lombok.Getter;
 
 /**
  * Thrown when video-service is unavailable or returns an unexpected error. This is retryable - the
@@ -25,5 +24,4 @@ public class VideoServiceException extends RuntimeException {
     this.videoId = videoId;
     this.retryable = retryable;
   }
-
 }

@@ -72,7 +72,7 @@ public class VideoServiceClient {
       // Re-throw VideoServiceException without wrapping
       throw e;
 
-    }  catch (Exception e) {
+    } catch (Exception e) {
       log.error("Unexpected error fetching video {}: {}", videoId, e.getMessage());
       throw new VideoServiceException(videoId, "Unexpected error fetching video", e, true);
     }
