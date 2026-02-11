@@ -1,0 +1,45 @@
+package com.accountabilityatlas.searchservice.event;
+
+import static org.mockito.Mockito.*;
+
+import com.accountabilityatlas.searchservice.service.IndexingService;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class ModerationEventHandlersTest {
+
+  @Mock private IndexingService indexingService;
+  @InjectMocks private ModerationEventHandlers handlers;
+
+  @Test
+  void handleVideoApproved_callsIndexVideo() {
+    UUID videoId = UUID.randomUUID();
+    VideoApprovedEvent event =
+        new VideoApprovedEvent("VideoApproved", videoId, UUID.randomUUID(), Instant.now());
+
+    Consumer<VideoApprovedEvent> handler = handlers.handleVideoApproved();
+    handler.accept(event);
+
+    verify(indexingService).indexVideo(videoId);
+  }
+
+  @Test
+  void handleVideoRejected_callsRemoveVideo() {
+    UUID videoId = UUID.randomUUID();
+    VideoRejectedEvent event =
+        new VideoRejectedEvent(
+            "VideoRejected", videoId, UUID.randomUUID(), "OFF_TOPIC", null, Instant.now());
+
+    Consumer<VideoRejectedEvent> handler = handlers.handleVideoRejected();
+    handler.accept(event);
+
+    verify(indexingService).removeVideo(videoId);
+  }
+}
