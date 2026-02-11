@@ -147,4 +147,5 @@ API interfaces and DTOs are generated from `docs/api-specification.yaml` by the 
 ## Documentation
 
 - [Technical Overview](docs/technical.md)
+- [Database Schema](docs/database-schema.md)
 - [API Specification](docs/api-specification.yaml) (OpenAPI 3.1)
