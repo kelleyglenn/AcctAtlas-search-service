@@ -1,7 +1,9 @@
 package com.accountabilityatlas.searchservice.service;
 
 import com.accountabilityatlas.searchservice.client.VideoDetail;
+import com.accountabilityatlas.searchservice.client.VideoNotFoundException;
 import com.accountabilityatlas.searchservice.client.VideoServiceClient;
+import com.accountabilityatlas.searchservice.client.VideoServiceException;
 import com.accountabilityatlas.searchservice.domain.SearchVideo;
 import com.accountabilityatlas.searchservice.repository.SearchVideoRepository;
 import java.time.Instant;
@@ -19,17 +21,29 @@ public class IndexingService {
   private final SearchVideoRepository searchVideoRepository;
   private final VideoServiceClient videoServiceClient;
 
+  /**
+   * Indexes a video in the search database.
+   *
+   * @param videoId the video ID to index
+   * @throws VideoServiceException if video-service is unavailable (triggers retry/DLQ)
+   */
   @Transactional
   public void indexVideo(UUID videoId) {
     log.info("Indexing video {}", videoId);
 
-    var videoOpt = videoServiceClient.getVideo(videoId);
-    if (videoOpt.isEmpty()) {
-      log.warn("Video {} not found, skipping indexing", videoId);
+    VideoDetail video;
+    try {
+      video = videoServiceClient.getVideo(videoId);
+    } catch (VideoNotFoundException e) {
+      // Video doesn't exist - this is expected if video was deleted after approval
+      // Don't retry, just skip indexing
+      log.warn(
+          "Video {} not found in video-service, skipping indexing (may have been deleted)",
+          videoId);
       return;
     }
+    // VideoServiceException propagates up to trigger retry/DLQ
 
-    VideoDetail video = videoOpt.get();
     if (!"APPROVED".equals(video.status())) {
       log.warn("Video {} is not approved (status={}), skipping indexing", videoId, video.status());
       return;

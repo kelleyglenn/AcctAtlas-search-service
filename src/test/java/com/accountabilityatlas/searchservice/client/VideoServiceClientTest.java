@@ -6,17 +6,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
@@ -51,53 +56,98 @@ class VideoServiceClientTest {
     VideoDetail expectedVideo = createTestVideo(videoId);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.just(expectedVideo));
 
-    Optional<VideoDetail> result = videoServiceClient.getVideo(videoId);
+    VideoDetail result = videoServiceClient.getVideo(videoId);
 
-    assertThat(result).isPresent();
-    assertThat(result.get().id()).isEqualTo(videoId);
-    assertThat(result.get().title()).isEqualTo("Test Video");
-    assertThat(result.get().status()).isEqualTo("APPROVED");
+    assertThat(result.id()).isEqualTo(videoId);
+    assertThat(result.title()).isEqualTo("Test Video");
+    assertThat(result.status()).isEqualTo("APPROVED");
   }
 
   @Test
-  void getVideo_whenVideoNotFound_returnsEmpty() {
+  void getVideo_whenVideoNotFound_throwsVideoNotFoundException() {
     WebClientResponseException notFound =
         WebClientResponseException.create(404, "Not Found", null, null, null);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(notFound));
 
-    Optional<VideoDetail> result = videoServiceClient.getVideo(videoId);
-
-    assertThat(result).isEmpty();
+    assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
+        .isInstanceOf(VideoNotFoundException.class)
+        .hasMessageContaining(videoId.toString());
   }
 
   @Test
-  void getVideo_whenServerError_throwsRuntimeException() {
+  void getVideo_whenServerError_throwsRetryableVideoServiceException() {
     WebClientResponseException serverError =
         WebClientResponseException.create(500, "Internal Server Error", null, null, null);
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(serverError));
 
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessageContaining("Failed to fetch video from video-service");
+        .isInstanceOf(VideoServiceException.class)
+        .satisfies(
+            ex -> {
+              VideoServiceException vse = (VideoServiceException) ex;
+              assertThat(vse.getVideoId()).isEqualTo(videoId);
+              assertThat(vse.isRetryable()).isTrue();
+            });
   }
 
   @Test
-  void getVideo_whenConnectionError_throwsRuntimeException() {
-    when(responseSpec.bodyToMono(VideoDetail.class))
-        .thenReturn(Mono.error(new RuntimeException("Connection refused")));
+  void getVideo_whenServiceUnavailable_throwsRetryableVideoServiceException() {
+    WebClientResponseException unavailable =
+        WebClientResponseException.create(
+            HttpStatus.SERVICE_UNAVAILABLE.value(), "Service Unavailable", null, null, null);
+    when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(unavailable));
 
     assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessageContaining("Failed to fetch video from video-service");
+        .isInstanceOf(VideoServiceException.class)
+        .satisfies(
+            ex -> {
+              VideoServiceException vse = (VideoServiceException) ex;
+              assertThat(vse.isRetryable()).isTrue();
+              assertThat(vse.getMessage()).contains("temporarily unavailable");
+            });
   }
 
   @Test
-  void getVideo_whenResponseIsNull_returnsEmpty() {
+  void getVideo_whenConnectionError_throwsRetryableVideoServiceException() {
+    WebClientRequestException connectionError =
+        new WebClientRequestException(
+            new RuntimeException("Connection refused"),
+            HttpMethod.GET,
+            URI.create("http://localhost:8082/videos/" + videoId),
+            HttpHeaders.EMPTY);
+    when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(connectionError));
+
+    assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
+        .isInstanceOf(VideoServiceException.class)
+        .satisfies(
+            ex -> {
+              VideoServiceException vse = (VideoServiceException) ex;
+              assertThat(vse.isRetryable()).isTrue();
+              assertThat(vse.getMessage()).contains("Failed to connect");
+            });
+  }
+
+  @Test
+  void getVideo_whenBadRequest_throwsNonRetryableVideoServiceException() {
+    WebClientResponseException badRequest =
+        WebClientResponseException.create(400, "Bad Request", null, null, null);
+    when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.error(badRequest));
+
+    assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
+        .isInstanceOf(VideoServiceException.class)
+        .satisfies(
+            ex -> {
+              VideoServiceException vse = (VideoServiceException) ex;
+              assertThat(vse.isRetryable()).isFalse();
+            });
+  }
+
+  @Test
+  void getVideo_whenResponseIsNull_throwsVideoNotFoundException() {
     when(responseSpec.bodyToMono(VideoDetail.class)).thenReturn(Mono.empty());
 
-    Optional<VideoDetail> result = videoServiceClient.getVideo(videoId);
-
-    assertThat(result).isEmpty();
+    assertThatThrownBy(() -> videoServiceClient.getVideo(videoId))
+        .isInstanceOf(VideoNotFoundException.class);
   }
 
   private VideoDetail createTestVideo(UUID id) {
@@ -114,7 +164,7 @@ class VideoServiceClientTest {
         List.of("FIRST", "FOURTH"),
         List.of("POLICE", "CITIZEN"),
         "APPROVED",
-        OffsetDateTime.now(),
+        OffsetDateTime.now(ZoneOffset.UTC),
         null);
   }
 }

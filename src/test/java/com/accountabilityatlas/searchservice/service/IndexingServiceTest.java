@@ -1,15 +1,19 @@
 package com.accountabilityatlas.searchservice.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.accountabilityatlas.searchservice.client.VideoDetail;
+import com.accountabilityatlas.searchservice.client.VideoNotFoundException;
 import com.accountabilityatlas.searchservice.client.VideoServiceClient;
+import com.accountabilityatlas.searchservice.client.VideoServiceException;
 import com.accountabilityatlas.searchservice.domain.SearchVideo;
 import com.accountabilityatlas.searchservice.repository.SearchVideoRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,9 +45,28 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_whenVideoNotFound_skipsIndexing() {
-    when(videoServiceClient.getVideo(videoId)).thenReturn(Optional.empty());
+    when(videoServiceClient.getVideo(videoId)).thenThrow(new VideoNotFoundException(videoId));
 
+    // Should not throw - VideoNotFoundException is handled gracefully
     indexingService.indexVideo(videoId);
+
+    verify(searchVideoRepository, never()).save(any());
+  }
+
+  @Test
+  void indexVideo_whenVideoServiceUnavailable_propagatesException() {
+    VideoServiceException serviceException =
+        new VideoServiceException(videoId, "Service unavailable", true);
+    when(videoServiceClient.getVideo(videoId)).thenThrow(serviceException);
+
+    // Should propagate to trigger retry/DLQ
+    assertThatThrownBy(() -> indexingService.indexVideo(videoId))
+        .isInstanceOf(VideoServiceException.class)
+        .satisfies(
+            ex -> {
+              VideoServiceException vse = (VideoServiceException) ex;
+              assertThat(vse.isRetryable()).isTrue();
+            });
 
     verify(searchVideoRepository, never()).save(any());
   }
@@ -51,7 +74,7 @@ class IndexingServiceTest {
   @Test
   void indexVideo_whenVideoNotApproved_skipsIndexing() {
     VideoDetail pendingVideo = createVideoDetail(videoId, "PENDING");
-    when(videoServiceClient.getVideo(videoId)).thenReturn(Optional.of(pendingVideo));
+    when(videoServiceClient.getVideo(videoId)).thenReturn(pendingVideo);
 
     indexingService.indexVideo(videoId);
 
@@ -60,7 +83,7 @@ class IndexingServiceTest {
 
   @Test
   void indexVideo_whenApproved_savesNewVideo() {
-    when(videoServiceClient.getVideo(videoId)).thenReturn(Optional.of(approvedVideo));
+    when(videoServiceClient.getVideo(videoId)).thenReturn(approvedVideo);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.empty());
 
     indexingService.indexVideo(videoId);
@@ -84,7 +107,7 @@ class IndexingServiceTest {
     existing.setId(videoId);
     existing.setTitle("Old Title");
 
-    when(videoServiceClient.getVideo(videoId)).thenReturn(Optional.of(approvedVideo));
+    when(videoServiceClient.getVideo(videoId)).thenReturn(approvedVideo);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.of(existing));
 
     indexingService.indexVideo(videoId);
@@ -101,7 +124,7 @@ class IndexingServiceTest {
     UUID locationId = UUID.randomUUID();
     VideoDetail videoWithLocation = createVideoDetailWithLocation(videoId, locationId);
 
-    when(videoServiceClient.getVideo(videoId)).thenReturn(Optional.of(videoWithLocation));
+    when(videoServiceClient.getVideo(videoId)).thenReturn(videoWithLocation);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.empty());
 
     indexingService.indexVideo(videoId);
@@ -133,10 +156,10 @@ class IndexingServiceTest {
             null, // null amendments
             null, // null participants
             "APPROVED",
-            OffsetDateTime.now(),
+            OffsetDateTime.now(ZoneOffset.UTC),
             null);
 
-    when(videoServiceClient.getVideo(videoId)).thenReturn(Optional.of(videoWithNulls));
+    when(videoServiceClient.getVideo(videoId)).thenReturn(videoWithNulls);
     when(searchVideoRepository.findById(videoId)).thenReturn(Optional.empty());
 
     indexingService.indexVideo(videoId);
@@ -180,7 +203,7 @@ class IndexingServiceTest {
         List.of("FIRST", "FOURTH"),
         List.of("POLICE", "CITIZEN"),
         status,
-        OffsetDateTime.now(),
+        OffsetDateTime.now(ZoneOffset.UTC),
         null);
   }
 
@@ -204,7 +227,7 @@ class IndexingServiceTest {
         List.of("FIRST"),
         List.of("POLICE"),
         "APPROVED",
-        OffsetDateTime.now(),
+        OffsetDateTime.now(ZoneOffset.UTC),
         List.of(videoLocation));
   }
 }

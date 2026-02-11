@@ -37,9 +37,9 @@ services:
       - "8084:8084"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/search
-      SPRING_DATASOURCE_USERNAME: search
-      SPRING_DATASOURCE_PASSWORD: search
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/search_service
+      SPRING_DATASOURCE_USERNAME: search_service
+      SPRING_DATASOURCE_PASSWORD: local_dev
       SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
       SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
       VIDEO_SERVICE_URL: http://host.docker.internal:8082
