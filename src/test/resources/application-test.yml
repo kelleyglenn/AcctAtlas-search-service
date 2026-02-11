@@ -1,0 +1,33 @@
+# Test profile configuration
+spring:
+  cloud:
+    stream:
+      # Disable SQS bindings for integration tests
+      function:
+        definition: ""
+    aws:
+      credentials:
+        access-key: test
+        secret-key: test
+      region:
+        static: us-east-1
+  jpa:
+    hibernate:
+      # Use 'none' because Flyway handles schema, and Hibernate can't validate TSVECTOR type
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_schema: search
+  flyway:
+    enabled: true
+    schemas:
+      - search
+
+app:
+  video-service:
+    base-url: http://localhost:9999
+
+logging:
+  level:
+    com.accountabilityatlas: DEBUG
+    org.testcontainers: INFO
