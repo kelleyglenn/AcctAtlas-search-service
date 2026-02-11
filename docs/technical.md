@@ -2,16 +2,14 @@
 
 ## Service Overview
 
-The Search Service provides full-text and faceted search capabilities across all video content in AccountabilityAtlas. It uses a pluggable search backend — PostgreSQL FTS in Phases 1-2, OpenSearch in Phase 3+ — and provides fast, relevance-ranked results.
+The Search Service provides full-text and faceted search capabilities across all video content in AccountabilityAtlas. It uses PostgreSQL FTS in Phase 1-2 with a denormalized `search_videos` table and provides fast, relevance-ranked results.
 
 ## Responsibilities
 
 - Execute full-text search queries with weighted ranking (title > channel > description)
-- Provide faceted filtering (amendments, participants, location, date)
-- Autocomplete suggestions (Phase 1-2: prefix matching via SQL `LIKE`; Phase 3+: OpenSearch completion suggester)
+- Provide faceted filtering (amendments, participants, state)
+- Index approved videos from moderation-events queue
 - Search result ranking and relevance tuning
-- Synonym handling for common terms (e.g., "1A" → "First Amendment", "cop" → "police")
-- Index video documents from SQS events (Phase 3+: OpenSearch indexing; Phase 1-2: handled by PostgreSQL trigger)
 
 ## Technology Stack
 
@@ -19,198 +17,265 @@ The Search Service provides full-text and faceted search capabilities across all
 |-----------|------------|
 | Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
-| Build | Gradle |
-| Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch 2.x (Phase 3+) |
-| Client | Spring Data JPA (Phase 1-2), OpenSearch Java Client (Phase 3+) |
+| Build | Gradle 9.x |
+| Database | PostgreSQL 15 (FTS) |
+| Messaging | Spring Cloud Stream with SQS |
+| API Client | WebClient (for video-service) |
 
 ## Architecture
 
-The search backend is abstracted behind a `SearchRepository` interface:
-
 ```
-SearchRepository (interface)
-├── PostgresSearchRepository  — active in Phase 1-2 (Spring profile: "fts")
-└── OpenSearchRepository      — active in Phase 3+  (Spring profile: "opensearch")
+moderation-service                     search-service                    video-service
+       │                                     │                                │
+       │  VideoApproved                      │                                │
+       ├────────────────────────────────────►│                                │
+       │  (moderation-events queue)          │  GET /videos/{id}              │
+       │                                     ├───────────────────────────────►│
+       │  Consumer<VideoApprovedEvent>       │◄───────────────────────────────┤
+       │                                     │  Index video                   │
+       │                                     │                                │
+       │  VideoRejected                      │                                │
+       ├────────────────────────────────────►│                                │
+       │  (moderation-events queue)          │  Remove from index             │
+       │                                     │                                │
 ```
 
-The active implementation is selected via Spring profile (`spring.profiles.active=fts` or `spring.profiles.active=opensearch`). Both implementations expose the same search, suggest, and facet operations through the API endpoints below.
+## Domain Model
+
+### SearchVideo Entity
+
+Denormalized video data optimized for search:
+
+```java
+@Entity
+@Table(name = "search_videos", schema = "search")
+public class SearchVideo {
+  @Id private UUID id;
+  private String youtubeId;
+  private String title;
+  private String description;
+  private String thumbnailUrl;
+  private Integer durationSeconds;
+  private String channelId;
+  private String channelName;
+  private LocalDate videoDate;
+  private String[] amendments;
+  private String[] participants;
+  private UUID primaryLocationId;
+  private String primaryLocationName;
+  private String primaryLocationCity;
+  private String primaryLocationState;
+  private Double primaryLocationLat;
+  private Double primaryLocationLng;
+  private Instant indexedAt;
+  private String searchVector; // tsvector, managed by trigger
+}
+```
+
+## Database Schema
+
+The service uses a dedicated `search` schema with a denormalized `search_videos` table:
+
+```sql
+CREATE TABLE search.search_videos (
+    id UUID PRIMARY KEY,
+    youtube_id VARCHAR(11) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    thumbnail_url VARCHAR(500),
+    duration_seconds INTEGER,
+    channel_id VARCHAR(50),
+    channel_name VARCHAR(255),
+    video_date DATE,
+    amendments VARCHAR(20)[] NOT NULL DEFAULT '{}',
+    participants VARCHAR(20)[] NOT NULL DEFAULT '{}',
+    primary_location_id UUID,
+    primary_location_name VARCHAR(200),
+    primary_location_city VARCHAR(100),
+    primary_location_state VARCHAR(50),
+    primary_location_lat DOUBLE PRECISION,
+    primary_location_lng DOUBLE PRECISION,
+    indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    search_vector TSVECTOR
+);
+```
+
+### Trigger for search_vector
+
+```sql
+CREATE OR REPLACE FUNCTION search.update_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.search_vector :=
+        setweight(to_tsvector('english', COALESCE(NEW.title, '')), 'A') ||
+        setweight(to_tsvector('english', COALESCE(NEW.channel_name, '')), 'B') ||
+        setweight(to_tsvector('english', COALESCE(NEW.description, '')), 'C');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Indexes
+
+- GIN index on `search_vector` for full-text search
+- GIN indexes on `amendments` and `participants` arrays for filtering
+- B-tree indexes on `youtube_id`, `channel_id`, `video_date`, `primary_location_state`
+
+## API Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /search | Public | Execute search query with filters |
+
+### Query Parameters (GET /search)
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| q | String | Search query text |
+| amendments | String[] | Filter by amendments (e.g., FIRST, FOURTH) |
+| participants | String[] | Filter by participants (e.g., POLICE, CITIZEN) |
+| state | String | Filter by US state |
+| page | Int | Page number (0-indexed) |
+| size | Int | Page size (default: 20, max: 100) |
+
+### Search Response
+
+```json
+{
+  "results": [
+    {
+      "id": "uuid",
+      "youtubeId": "dQw4w9WgXcQ",
+      "title": "Video Title",
+      "description": "Description...",
+      "thumbnailUrl": "https://...",
+      "durationSeconds": 120,
+      "channelId": "UC...",
+      "channelName": "Channel Name",
+      "videoDate": "2024-01-15",
+      "amendments": ["FIRST", "FOURTH"],
+      "participants": ["POLICE", "CITIZEN"],
+      "locations": [
+        {
+          "id": "uuid",
+          "displayName": "Location Name",
+          "city": "City",
+          "state": "CA",
+          "coordinates": { "latitude": 34.05, "longitude": -118.25 }
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "page": 0,
+    "size": 20,
+    "totalElements": 150,
+    "totalPages": 8
+  },
+  "queryTime": 15,
+  "query": "first amendment"
+}
+```
+
+## Events Consumed
+
+| Event | Source | Action |
+|-------|--------|--------|
+| VideoApproved | moderation-events queue | Fetch video from video-service, index in search_videos |
+| VideoRejected | moderation-events queue | Remove video from search_videos |
+
+### Event Handlers
+
+```java
+@Configuration
+public class ModerationEventHandlers {
+
+  @Bean
+  public Consumer<VideoApprovedEvent> handleVideoApproved() {
+    return event -> indexingService.indexVideo(event.videoId());
+  }
+
+  @Bean
+  public Consumer<VideoRejectedEvent> handleVideoRejected() {
+    return event -> indexingService.removeVideo(event.videoId());
+  }
+}
+```
+
+## Spring Cloud Stream Configuration
+
+```yaml
+spring:
+  cloud:
+    stream:
+      bindings:
+        handleVideoApproved-in-0:
+          destination: moderation-events
+          group: search-service
+        handleVideoRejected-in-0:
+          destination: moderation-events
+          group: search-service
+      function:
+        definition: handleVideoApproved;handleVideoRejected
+```
 
 ## Dependencies
 
-- **PostgreSQL** (Phase 1-2): Search queries via `tsvector`/`tsquery` against the `content.videos` table
-- **OpenSearch** (Phase 3+): Dedicated search index storage and querying
-- **SQS**: Event consumption (VideoApproved, VideoUpdated, VideoDeleted)
+- **PostgreSQL**: Search index storage via `search.search_videos` table
+- **SQS**: Event consumption from `moderation-events` queue
+- **video-service**: HTTP client for fetching full video details on indexing
 
 ## Documentation Index
 
 | Document | Status | Description |
 |----------|--------|-------------|
 | [api-specification.yaml](api-specification.yaml) | Complete | OpenAPI 3.1 specification |
-| [index-mapping.md](index-mapping.md) | Planned | OpenSearch index configuration (Phase 3+) |
-| [query-patterns.md](query-patterns.md) | Planned | Search query implementations (both backends) |
-| [relevance-tuning.md](relevance-tuning.md) | Planned | Ranking and scoring rules |
-
-## Search Index Schema
-
-### Phase 1-2: PostgreSQL FTS
-
-Search is powered by a `search_vector tsvector` column on `content.videos` with a GIN index. Weighted ranking: title (A), channel_name (B), description (C). A custom `acct_atlas` text search configuration provides domain-specific synonyms.
-
-See [05-DataArchitecture.md](../../../docs/05-DataArchitecture.md#full-text-search-configuration-phase-1-2) for full DDL, trigger definition, and example queries.
-
-### Phase 3+: OpenSearch Index
-
-```json
-{
-  "mappings": {
-    "properties": {
-      "id": { "type": "keyword" },
-      "youtubeId": { "type": "keyword" },
-      "title": {
-        "type": "text",
-        "analyzer": "video_analyzer",
-        "fields": { "keyword": { "type": "keyword" } }
-      },
-      "description": { "type": "text", "analyzer": "video_analyzer" },
-      "channelId": { "type": "keyword" },
-      "channelName": {
-        "type": "text",
-        "fields": { "keyword": { "type": "keyword" } }
-      },
-      "publishedAt": { "type": "date" },
-      "amendments": { "type": "keyword" },
-      "participants": { "type": "keyword" },
-      "videoDate": { "type": "date" },
-      "submitterName": { "type": "keyword" },
-      "locations": {
-        "type": "nested",
-        "properties": {
-          "id": { "type": "keyword" },
-          "coordinates": { "type": "geo_point" },
-          "city": { "type": "keyword" },
-          "state": { "type": "keyword" }
-        }
-      },
-      "createdAt": { "type": "date" },
-      "suggest": { "type": "completion" }
-    }
-  }
-}
-```
-
-## API Endpoints
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | /search | Public | Execute search query |
-| GET | /search/suggest | Public | Autocomplete suggestions |
-| GET | /search/facets | Public | Get available facet values |
-
-## Query Parameters (GET /search)
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| q | String | Search query text |
-| amendments | String[] | Filter by amendments |
-| participants | String[] | Filter by participants |
-| dateFrom | Date | Filter videos after date |
-| dateTo | Date | Filter videos before date |
-| state | String | Filter by state |
-| bbox | String | Geo filter: minLng,minLat,maxLng,maxLat |
-| sort | String | Sort by: relevance, date, distance |
-| page | Int | Page number (0-indexed) |
-| size | Int | Page size (default: 20, max: 100) |
-
-## Search Response
-
-```java
-public record SearchResponse(
-    List<VideoSearchResult> results,
-    SearchFacets facets,
-    Pagination pagination,
-    Duration queryTime
-) { }
-
-public record VideoSearchResult(
-    UUID id,
-    String youtubeId,
-    String title,
-    String description,
-    String thumbnailUrl,
-    Set<Amendment> amendments,
-    Set<Participant> participants,
-    List<LocationSummary> locations,
-    float score,
-    Map<String, List<String>> highlights
-) { }
-
-public record SearchFacets(
-    Map<Amendment, Integer> amendments,
-    Map<Participant, Integer> participants,
-    Map<String, Integer> states,
-    Map<Integer, Integer> years
-) { }
-```
-
-## Synonym Configuration
-
-```yaml
-synonyms:
-  - "cop, police, officer, law enforcement, LEO"
-  - "1a, first amendment, free speech, freedom of speech"
-  - "2a, second amendment, gun rights, right to bear arms"
-  - "4a, fourth amendment, search and seizure, unreasonable search"
-  - "5a, fifth amendment, self incrimination, right to remain silent"
-  - "audit, auditor, auditing"
-  - "tyrant, tyranny, abuse of power"
-```
-
-## Events Consumed
-
-| Event | Phase 1-2 Action | Phase 3+ Action |
-|-------|------------------|-----------------|
-| VideoApproved | No action (tsvector trigger handles indexing) | Index new document in OpenSearch |
-| VideoUpdated | No action (tsvector trigger handles updates) | Update existing document in OpenSearch |
-| VideoDeleted | No action (CASCADE delete removes row) | Remove document from OpenSearch |
-
-## Reindexing
-
-### Phase 1-2 (PostgreSQL FTS)
-
-Reindex by regenerating the `search_vector` column:
-
-```sql
-UPDATE content.videos SET search_vector =
-    setweight(to_tsvector('acct_atlas', COALESCE(title, '')), 'A') ||
-    setweight(to_tsvector('acct_atlas', COALESCE(channel_name, '')), 'B') ||
-    setweight(to_tsvector('acct_atlas', COALESCE(description, '')), 'C');
-```
-
-### Phase 3+ (OpenSearch)
-
-Full reindex capability for schema changes, analyzer updates, and disaster recovery:
-
-```bash
-# Trigger reindex via admin endpoint
-POST /admin/reindex
-Authorization: Bearer <admin_token>
-
-# Returns job ID for tracking
-{ "jobId": "uuid", "status": "IN_PROGRESS", "documentCount": 0 }
-```
+| [../../../docs/05-DataArchitecture.md](../../../docs/05-DataArchitecture.md) | Reference | Full-text search configuration |
 
 ## Local Development
 
 ```bash
-# Phase 1-2: Start with PostgreSQL FTS (default)
-docker-compose up -d postgres
-./gradlew bootRun --args='--spring.profiles.active=local,fts'
+# Start dependencies
+docker-compose up -d postgres localstack
 
-# Phase 3+: Start with OpenSearch
-docker-compose up -d postgres opensearch
-# Wait for OpenSearch to be ready
-curl -s http://localhost:9200/_cluster/health | jq .status
-./gradlew bootRun --args='--spring.profiles.active=local,opensearch'
+# Run service
+./gradlew bootRun
 
 # Service available at http://localhost:8084
+```
+
+### Port Assignments
+
+| Service | Port |
+|---------|------|
+| search-service | 8084 |
+| PostgreSQL | 5436 (local docker-compose) |
+| LocalStack SQS | 4566 |
+
+## Project Structure
+
+```
+src/main/java/com/accountabilityatlas/searchservice/
+├── SearchServiceApplication.java
+├── client/
+│   ├── VideoDetail.java          # DTO for video-service response
+│   └── VideoServiceClient.java   # WebClient for video-service
+├── config/
+│   └── SecurityConfig.java       # All search endpoints public
+├── domain/
+│   ├── Amendment.java
+│   ├── Participant.java
+│   └── SearchVideo.java          # JPA entity
+├── event/
+│   ├── ModerationEventHandlers.java  # Spring Cloud Stream consumers
+│   ├── VideoApprovedEvent.java
+│   └── VideoRejectedEvent.java
+├── repository/
+│   └── SearchVideoRepository.java    # JPA + native FTS queries
+├── service/
+│   ├── IndexingService.java      # Index/remove videos
+│   ├── SearchResult.java
+│   └── SearchService.java        # Search with filters
+└── web/
+    └── SearchController.java     # REST endpoint
 ```
