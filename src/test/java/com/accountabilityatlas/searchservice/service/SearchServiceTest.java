@@ -205,4 +205,65 @@ class SearchServiceTest {
 
     assertThat(queryCaptor.getValue()).isEqualTo("test query");
   }
+
+  @Test
+  void search_withInvalidAmendments_filtersOutInvalidValues() {
+    Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
+    when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
+        .thenReturn(page);
+
+    // Include invalid value that could be SQL injection attempt
+    searchService.search(null, Set.of("FIRST", "INVALID", "};DROP TABLE--"), null, null, pageable);
+
+    verify(searchVideoRepository)
+        .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
+
+    String amendments = amendmentsCaptor.getValue();
+    assertThat(amendments).isEqualTo("{FIRST}");
+    assertThat(amendments).doesNotContain("INVALID").doesNotContain("DROP");
+  }
+
+  @Test
+  void search_withAllInvalidAmendments_passesNullToRepository() {
+    Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
+    when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
+        .thenReturn(page);
+
+    searchService.search(null, Set.of("INVALID", "ALSO_INVALID"), null, null, pageable);
+
+    verify(searchVideoRepository)
+        .searchWithFilters(any(), amendmentsCaptor.capture(), any(), any(), eq(pageable));
+
+    assertThat(amendmentsCaptor.getValue()).isNull();
+  }
+
+  @Test
+  void search_withInvalidParticipants_filtersOutInvalidValues() {
+    Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
+    when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
+        .thenReturn(page);
+
+    searchService.search(null, null, Set.of("POLICE", "HACKER", "},{bad}"), null, pageable);
+
+    verify(searchVideoRepository)
+        .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
+
+    String participants = participantsCaptor.getValue();
+    assertThat(participants).isEqualTo("{POLICE}");
+    assertThat(participants).doesNotContain("HACKER").doesNotContain("bad");
+  }
+
+  @Test
+  void search_withAllInvalidParticipants_passesNullToRepository() {
+    Page<SearchVideo> page = new PageImpl<>(List.of(), pageable, 0);
+    when(searchVideoRepository.searchWithFilters(any(), any(), any(), any(), any()))
+        .thenReturn(page);
+
+    searchService.search(null, null, Set.of("NOT_A_PARTICIPANT"), null, pageable);
+
+    verify(searchVideoRepository)
+        .searchWithFilters(any(), any(), participantsCaptor.capture(), any(), eq(pageable));
+
+    assertThat(participantsCaptor.getValue()).isNull();
+  }
 }
