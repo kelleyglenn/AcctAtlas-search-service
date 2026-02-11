@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5436/search
+    username: search
+    password: search
+    driver-class-name: org.postgresql.Driver
+  cloud:
+    aws:
+      sqs:
+        endpoint: http://localhost:4566
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    io.awspring.cloud: DEBUG

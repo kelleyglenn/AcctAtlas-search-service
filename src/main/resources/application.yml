@@ -1,0 +1,60 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: search-service
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: search
+  flyway:
+    enabled: true
+    schemas:
+      - search
+    locations:
+      - classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:us-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+    stream:
+      bindings:
+        handleVideoApproved-in-0:
+          destination: moderation-events
+          group: search-service
+        handleVideoRejected-in-0:
+          destination: moderation-events
+          group: search-service
+      function:
+        definition: handleVideoApproved;handleVideoRejected
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.accountabilityatlas: DEBUG
+
+app:
+  search:
+    default-page-size: 20
+    max-page-size: 100
+  video-service:
+    base-url: ${VIDEO_SERVICE_URL:http://localhost:8082}
