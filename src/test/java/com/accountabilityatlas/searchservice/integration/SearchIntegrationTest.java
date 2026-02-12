@@ -21,7 +21,11 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest
+@SpringBootTest(
+    properties = {
+      // Disable SQS listener for search tests - we're only testing the search functionality
+      "spring.cloud.aws.sqs.enabled=false"
+    })
 @AutoConfigureMockMvc
 @Testcontainers
 @ActiveProfiles("test")
