@@ -71,6 +71,10 @@ public class SearchVideo {
   @Column(name = "indexed_at", nullable = false)
   private Instant indexedAt;
 
-  @Column(name = "search_vector", insertable = false, updatable = false)
+  @Column(
+      name = "search_vector",
+      insertable = false,
+      updatable = false,
+      columnDefinition = "tsvector")
   private String searchVector;
 }
