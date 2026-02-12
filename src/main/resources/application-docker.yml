@@ -7,6 +7,9 @@ spring:
     url: ${SPRING_FLYWAY_URL:${SPRING_DATASOURCE_URL}}
     user: ${SPRING_FLYWAY_USER:${SPRING_DATASOURCE_USERNAME}}
     password: ${SPRING_FLYWAY_PASSWORD:${SPRING_DATASOURCE_PASSWORD}}
+    locations:
+      - classpath:db/migration
+      - classpath:db/devdata
   cloud:
     aws:
       sqs:
