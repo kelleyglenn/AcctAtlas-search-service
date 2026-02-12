@@ -1,11 +1,11 @@
 package com.accountabilityatlas.searchservice.event;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 import com.accountabilityatlas.searchservice.service.IndexingService;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,33 +19,56 @@ class ModerationEventHandlersTest {
   @InjectMocks private ModerationEventHandlers handlers;
 
   @Test
-  void handleVideoApproved_callsIndexVideo() {
+  void handleModerationEvent_videoApproved_callsIndexVideo() {
     // Arrange
     UUID videoId = UUID.randomUUID();
-    VideoApprovedEvent event =
-        new VideoApprovedEvent("VideoApproved", videoId, UUID.randomUUID(), Instant.now());
+    VideoApprovedEvent event = new VideoApprovedEvent(videoId, UUID.randomUUID(), Instant.now());
 
     // Act
-    Consumer<VideoApprovedEvent> handler = handlers.handleVideoApproved();
-    handler.accept(event);
+    handlers.handleModerationEvent(event);
 
     // Assert
     verify(indexingService).indexVideo(videoId);
   }
 
   @Test
-  void handleVideoRejected_callsRemoveVideo() {
+  void handleModerationEvent_videoRejected_callsRemoveVideo() {
     // Arrange
     UUID videoId = UUID.randomUUID();
     VideoRejectedEvent event =
-        new VideoRejectedEvent(
-            "VideoRejected", videoId, UUID.randomUUID(), "OFF_TOPIC", null, Instant.now());
+        new VideoRejectedEvent(videoId, UUID.randomUUID(), "OFF_TOPIC", Instant.now());
 
     // Act
-    Consumer<VideoRejectedEvent> handler = handlers.handleVideoRejected();
-    handler.accept(event);
+    handlers.handleModerationEvent(event);
 
     // Assert
     verify(indexingService).removeVideo(videoId);
+  }
+
+  @Test
+  void handleModerationEvent_videoApproved_indexingFailure_rethrowsException() {
+    // Arrange
+    UUID videoId = UUID.randomUUID();
+    VideoApprovedEvent event = new VideoApprovedEvent(videoId, UUID.randomUUID(), Instant.now());
+
+    RuntimeException indexingException = new RuntimeException("OpenSearch unavailable");
+    doThrow(indexingException).when(indexingService).indexVideo(videoId);
+
+    // Act & Assert
+    assertThatThrownBy(() -> handlers.handleModerationEvent(event)).isSameAs(indexingException);
+  }
+
+  @Test
+  void handleModerationEvent_videoRejected_removalFailure_rethrowsException() {
+    // Arrange
+    UUID videoId = UUID.randomUUID();
+    VideoRejectedEvent event =
+        new VideoRejectedEvent(videoId, UUID.randomUUID(), "OFF_TOPIC", Instant.now());
+
+    RuntimeException removalException = new RuntimeException("OpenSearch unavailable");
+    doThrow(removalException).when(indexingService).removeVideo(videoId);
+
+    // Act & Assert
+    assertThatThrownBy(() -> handlers.handleModerationEvent(event)).isSameAs(removalException);
   }
 }
