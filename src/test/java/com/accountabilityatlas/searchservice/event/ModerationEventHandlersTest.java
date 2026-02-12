@@ -1,5 +1,6 @@
 package com.accountabilityatlas.searchservice.event;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 import com.accountabilityatlas.searchservice.service.IndexingService;
@@ -42,5 +43,32 @@ class ModerationEventHandlersTest {
 
     // Assert
     verify(indexingService).removeVideo(videoId);
+  }
+
+  @Test
+  void handleModerationEvent_videoApproved_indexingFailure_rethrowsException() {
+    // Arrange
+    UUID videoId = UUID.randomUUID();
+    VideoApprovedEvent event = new VideoApprovedEvent(videoId, UUID.randomUUID(), Instant.now());
+
+    RuntimeException indexingException = new RuntimeException("OpenSearch unavailable");
+    doThrow(indexingException).when(indexingService).indexVideo(videoId);
+
+    // Act & Assert
+    assertThatThrownBy(() -> handlers.handleModerationEvent(event)).isSameAs(indexingException);
+  }
+
+  @Test
+  void handleModerationEvent_videoRejected_removalFailure_rethrowsException() {
+    // Arrange
+    UUID videoId = UUID.randomUUID();
+    VideoRejectedEvent event =
+        new VideoRejectedEvent(videoId, UUID.randomUUID(), "OFF_TOPIC", Instant.now());
+
+    RuntimeException removalException = new RuntimeException("OpenSearch unavailable");
+    doThrow(removalException).when(indexingService).removeVideo(videoId);
+
+    // Act & Assert
+    assertThatThrownBy(() -> handlers.handleModerationEvent(event)).isSameAs(removalException);
   }
 }
