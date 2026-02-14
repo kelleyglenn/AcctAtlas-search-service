@@ -31,6 +31,10 @@ public class SearchService {
       Set<String> amendments,
       Set<String> participants,
       String state,
+      Double minLng,
+      Double minLat,
+      Double maxLng,
+      Double maxLat,
       Pageable pageable) {
 
     long startTime = System.currentTimeMillis();
@@ -41,7 +45,15 @@ public class SearchService {
 
     Page<SearchVideo> page =
         searchVideoRepository.searchWithFilters(
-            searchQuery, amendmentsArray, participantsArray, state, pageable);
+            searchQuery,
+            amendmentsArray,
+            participantsArray,
+            state,
+            minLat,
+            maxLat,
+            minLng,
+            maxLng,
+            pageable);
 
     long queryTime = System.currentTimeMillis() - startTime;
 
