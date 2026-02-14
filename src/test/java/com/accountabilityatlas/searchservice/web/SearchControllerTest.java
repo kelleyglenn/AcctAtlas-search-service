@@ -52,7 +52,8 @@ class SearchControllerTest {
   @Test
   void search_returnsOkWithEmptyResults() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act & Assert
     mockMvc
@@ -66,20 +67,23 @@ class SearchControllerTest {
   @Test
   void search_withQuery_passesQueryToService() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc.perform(get("/search").param("q", "police audit")).andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(eq("police audit"), any(), any(), any(), any());
+    verify(searchService)
+        .search(eq("police audit"), any(), any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
   void search_withResults_returnsVideoData() throws Exception {
     // Arrange
     SearchResult result = new SearchResult(List.of(testVideo), 1, 1, 0, 20, 10);
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(result);
 
     // Act & Assert
     mockMvc
@@ -98,7 +102,8 @@ class SearchControllerTest {
   @Test
   void search_withAmendmentsFilter_passesAmendmentsToService() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc
@@ -106,14 +111,16 @@ class SearchControllerTest {
         .andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(any(), amendmentsCaptor.capture(), any(), any(), any());
+    verify(searchService)
+        .search(any(), amendmentsCaptor.capture(), any(), any(), any(), any(), any(), any(), any());
     assertThat(amendmentsCaptor.getValue()).containsExactlyInAnyOrder("FIRST", "FOURTH");
   }
 
   @Test
   void search_withParticipantsFilter_passesParticipantsToService() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc
@@ -121,26 +128,30 @@ class SearchControllerTest {
         .andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(any(), any(), participantsCaptor.capture(), any(), any());
+    verify(searchService)
+        .search(
+            any(), any(), participantsCaptor.capture(), any(), any(), any(), any(), any(), any());
     assertThat(participantsCaptor.getValue()).containsExactlyInAnyOrder("POLICE", "CITIZEN");
   }
 
   @Test
   void search_withStateFilter_passesStateToService() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc.perform(get("/search").param("state", "TX")).andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(any(), any(), any(), eq("TX"), any());
+    verify(searchService).search(any(), any(), any(), eq("TX"), any(), any(), any(), any(), any());
   }
 
   @Test
   void search_withPagination_passesPageableToService() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc
@@ -148,7 +159,8 @@ class SearchControllerTest {
         .andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
+    verify(searchService)
+        .search(any(), any(), any(), any(), any(), any(), any(), any(), pageableCaptor.capture());
     Pageable pageable = pageableCaptor.getValue();
     assertThat(pageable.getPageNumber()).isEqualTo(2);
     assertThat(pageable.getPageSize()).isEqualTo(50);
@@ -157,26 +169,30 @@ class SearchControllerTest {
   @Test
   void search_withSizeOver100_capsAt100() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc.perform(get("/search").param("size", "200")).andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
+    verify(searchService)
+        .search(any(), any(), any(), any(), any(), any(), any(), any(), pageableCaptor.capture());
     assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
   }
 
   @Test
   void search_withDefaultPagination_usesDefaults() throws Exception {
     // Arrange
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(emptyResult);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
 
     // Act
     mockMvc.perform(get("/search")).andExpect(status().isOk());
 
     // Assert
-    verify(searchService).search(any(), any(), any(), any(), pageableCaptor.capture());
+    verify(searchService)
+        .search(any(), any(), any(), any(), any(), any(), any(), any(), pageableCaptor.capture());
     Pageable pageable = pageableCaptor.getValue();
     assertThat(pageable.getPageNumber()).isZero();
     assertThat(pageable.getPageSize()).isEqualTo(20);
@@ -187,7 +203,8 @@ class SearchControllerTest {
     // Arrange
     SearchVideo videoWithLocation = createTestVideoWithLocation();
     SearchResult result = new SearchResult(List.of(videoWithLocation), 1, 1, 0, 20, 5);
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(result);
 
     // Act & Assert
     mockMvc
@@ -204,7 +221,8 @@ class SearchControllerTest {
   void search_withNoLocation_returnsEmptyLocationsArray() throws Exception {
     // Arrange
     SearchResult result = new SearchResult(List.of(testVideo), 1, 1, 0, 20, 5);
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(result);
 
     // Act & Assert
     mockMvc
@@ -225,7 +243,8 @@ class SearchControllerTest {
     videoNullArrays.setParticipants(null);
 
     SearchResult result = new SearchResult(List.of(videoNullArrays), 1, 1, 0, 20, 5);
-    when(searchService.search(any(), any(), any(), any(), any())).thenReturn(result);
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(result);
 
     // Act & Assert
     mockMvc
@@ -235,6 +254,61 @@ class SearchControllerTest {
         .andExpect(jsonPath("$.results[0].amendments").isEmpty())
         .andExpect(jsonPath("$.results[0].participants").isArray())
         .andExpect(jsonPath("$.results[0].participants").isEmpty());
+  }
+
+  @Test
+  void search_withBbox_passesParsedCoordinatesToService() throws Exception {
+    // Arrange
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
+
+    // Act
+    mockMvc
+        .perform(get("/search").param("bbox", "-122.5,37.0,-121.0,38.0"))
+        .andExpect(status().isOk());
+
+    // Assert
+    verify(searchService)
+        .search(any(), any(), any(), any(), eq(-122.5), eq(37.0), eq(-121.0), eq(38.0), any());
+  }
+
+  @Test
+  void search_withInvalidBbox_returns400() throws Exception {
+    // Act & Assert - wrong number of values
+    mockMvc
+        .perform(get("/search").param("bbox", "-122.5,37.0,-121.0"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void search_withNonNumericBbox_returns400() throws Exception {
+    // Act & Assert - non-numeric values
+    mockMvc
+        .perform(get("/search").param("bbox", "abc,def,ghi,jkl"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void search_withNoBbox_passesNullCoordinatesToService() throws Exception {
+    // Arrange
+    when(searchService.search(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(emptyResult);
+
+    // Act
+    mockMvc.perform(get("/search")).andExpect(status().isOk());
+
+    // Assert
+    verify(searchService)
+        .search(
+            any(),
+            any(),
+            any(),
+            any(),
+            eq((Double) null),
+            eq((Double) null),
+            eq((Double) null),
+            eq((Double) null),
+            any());
   }
 
   private SearchVideo createTestVideo() {

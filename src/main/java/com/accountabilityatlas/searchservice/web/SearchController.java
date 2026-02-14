@@ -24,11 +24,12 @@ public class SearchController {
   private final SearchService searchService;
 
   @GetMapping
-  public ResponseEntity<SearchResponse> search(
+  public ResponseEntity<?> search(
       @RequestParam(required = false) String q,
       @RequestParam(required = false) Set<String> amendments,
       @RequestParam(required = false) Set<String> participants,
       @RequestParam(required = false) String state,
+      @RequestParam(required = false) String bbox,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
 
@@ -37,7 +38,31 @@ public class SearchController {
     }
     Pageable pageable = PageRequest.of(page, size);
 
-    SearchResult result = searchService.search(q, amendments, participants, state, pageable);
+    Double minLng = null;
+    Double minLat = null;
+    Double maxLng = null;
+    Double maxLat = null;
+
+    if (bbox != null && !bbox.isBlank()) {
+      String[] parts = bbox.split(",");
+      if (parts.length != 4) {
+        return ResponseEntity.badRequest()
+            .body("Invalid bbox format. Expected: minLng,minLat,maxLng,maxLat");
+      }
+      try {
+        minLng = Double.parseDouble(parts[0]);
+        minLat = Double.parseDouble(parts[1]);
+        maxLng = Double.parseDouble(parts[2]);
+        maxLat = Double.parseDouble(parts[3]);
+      } catch (NumberFormatException e) {
+        return ResponseEntity.badRequest()
+            .body("Invalid bbox format. Expected: minLng,minLat,maxLng,maxLat");
+      }
+    }
+
+    SearchResult result =
+        searchService.search(
+            q, amendments, participants, state, minLng, minLat, maxLng, maxLat, pageable);
 
     SearchResponse response =
         new SearchResponse(

@@ -195,6 +195,54 @@ class SearchIntegrationTest {
   }
 
   @Test
+  void search_withBbox_filtersToVideosWithinBounds() throws Exception {
+    SearchVideo insideBbox = createVideoWithLocation("SF Video", "Description", 37.7749, -122.4194);
+    SearchVideo outsideBbox =
+        createVideoWithLocation("Texas Video", "Description", 29.4241, -98.4936);
+    searchVideoRepository.saveAll(java.util.List.of(insideBbox, outsideBbox));
+
+    mockMvc
+        .perform(get("/search").param("bbox", "-123,37,-121,38"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.results.length()").value(1))
+        .andExpect(jsonPath("$.results[0].title").value("SF Video"));
+  }
+
+  @Test
+  void search_withBbox_excludesVideosOutsideBounds() throws Exception {
+    SearchVideo video1 =
+        createVideoWithLocation("Oakland Video", "Description", 37.8044, -122.2712);
+    SearchVideo video2 = createVideoWithLocation("Denver Video", "Description", 39.7392, -104.9903);
+    SearchVideo video3 =
+        createVideoWithLocation("Michigan Video", "Description", 42.7325, -84.5555);
+    searchVideoRepository.saveAll(java.util.List.of(video1, video2, video3));
+
+    // Bay Area bbox should only match Oakland
+    mockMvc
+        .perform(get("/search").param("bbox", "-123,37,-121,38"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.results.length()").value(1))
+        .andExpect(jsonPath("$.results[0].title").value("Oakland Video"));
+  }
+
+  @Test
+  void search_withoutBbox_returnsAllVideos() throws Exception {
+    SearchVideo video1 = createVideoWithLocation("SF Video", "Description", 37.7749, -122.4194);
+    SearchVideo video2 = createVideoWithLocation("Texas Video", "Description", 29.4241, -98.4936);
+    searchVideoRepository.saveAll(java.util.List.of(video1, video2));
+
+    mockMvc
+        .perform(get("/search"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.results.length()").value(2));
+  }
+
+  @Test
+  void search_withInvalidBbox_returns400() throws Exception {
+    mockMvc.perform(get("/search").param("bbox", "invalid")).andExpect(status().isBadRequest());
+  }
+
+  @Test
   void actuatorHealth_isAccessible() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
   }
@@ -213,6 +261,14 @@ class SearchIntegrationTest {
 
   private SearchVideo createVideoWithState(String title, String state) {
     return createVideo(title, "Description", new String[] {}, new String[] {}, state);
+  }
+
+  private SearchVideo createVideoWithLocation(
+      String title, String description, double lat, double lng) {
+    SearchVideo video = createVideo(title, description, new String[] {}, new String[] {}, null);
+    video.setPrimaryLocationLat(lat);
+    video.setPrimaryLocationLng(lng);
+    return video;
   }
 
   private SearchVideo createVideo(

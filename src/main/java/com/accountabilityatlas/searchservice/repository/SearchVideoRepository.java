@@ -20,6 +20,8 @@ public interface SearchVideoRepository extends JpaRepository<SearchVideo, UUID> 
             AND (:amendments IS NULL OR v.amendments && CAST(:amendments AS VARCHAR[]))
             AND (:participants IS NULL OR v.participants && CAST(:participants AS VARCHAR[]))
             AND (:state IS NULL OR v.primary_location_state = :state)
+            AND (:minLat IS NULL OR (v.primary_location_lat BETWEEN :minLat AND :maxLat
+                 AND v.primary_location_lng BETWEEN :minLng AND :maxLng))
           ORDER BY CASE WHEN :query IS NULL OR :query = '' THEN 0 ELSE ts_rank_cd(v.search_vector, plainto_tsquery('english', :query)) END DESC,
                    v.indexed_at DESC
           """,
@@ -31,8 +33,18 @@ public interface SearchVideoRepository extends JpaRepository<SearchVideo, UUID> 
             AND (:amendments IS NULL OR v.amendments && CAST(:amendments AS VARCHAR[]))
             AND (:participants IS NULL OR v.participants && CAST(:participants AS VARCHAR[]))
             AND (:state IS NULL OR v.primary_location_state = :state)
+            AND (:minLat IS NULL OR (v.primary_location_lat BETWEEN :minLat AND :maxLat
+                 AND v.primary_location_lng BETWEEN :minLng AND :maxLng))
           """,
       nativeQuery = true)
   Page<SearchVideo> searchWithFilters(
-      String query, String amendments, String participants, String state, Pageable pageable);
+      String query,
+      String amendments,
+      String participants,
+      String state,
+      Double minLat,
+      Double maxLat,
+      Double minLng,
+      Double maxLng,
+      Pageable pageable);
 }
