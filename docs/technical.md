@@ -8,7 +8,7 @@ The Search Service provides full-text and faceted search capabilities across all
 
 - Execute full-text search queries with weighted ranking (title > channel > description)
 - Provide faceted filtering (amendments, participants, state)
-- Index approved videos from moderation-events queue
+- Index approved videos from search-moderation-events queue
 - Search result ranking and relevance tuning
 
 ## Technology Stack
@@ -29,14 +29,14 @@ moderation-service                     search-service                    video-s
        │                                     │                                │
        │  VideoApproved                      │                                │
        ├────────────────────────────────────►│                                │
-       │  (moderation-events queue)          │  GET /videos/{id}              │
+       │  (search-moderation-events queue)   │  GET /videos/{id}              │
        │                                     ├───────────────────────────────►│
        │  Consumer<VideoApprovedEvent>       │◄───────────────────────────────┤
        │                                     │  Index video                   │
        │                                     │                                │
        │  VideoRejected                      │                                │
        ├────────────────────────────────────►│                                │
-       │  (moderation-events queue)          │  Remove from index             │
+       │  (search-moderation-events queue)   │  Remove from index             │
        │                                     │                                │
 ```
 
@@ -181,8 +181,8 @@ $$ LANGUAGE plpgsql;
 
 | Event | Source | Action |
 |-------|--------|--------|
-| VideoApproved | moderation-events queue | Fetch video from video-service, index in search_videos |
-| VideoRejected | moderation-events queue | Remove video from search_videos |
+| VideoApproved | search-moderation-events queue | Fetch video from video-service, index in search_videos |
+| VideoRejected | search-moderation-events queue | Remove video from search_videos |
 
 ### Event Handlers
 
@@ -210,10 +210,10 @@ spring:
     stream:
       bindings:
         handleVideoApproved-in-0:
-          destination: moderation-events
+          destination: search-moderation-events
           group: search-service
         handleVideoRejected-in-0:
-          destination: moderation-events
+          destination: search-moderation-events
           group: search-service
       function:
         definition: handleVideoApproved;handleVideoRejected
@@ -222,7 +222,7 @@ spring:
 ## Dependencies
 
 - **PostgreSQL**: Search index storage via `search.search_videos` table
-- **SQS**: Event consumption from `moderation-events` queue
+- **SQS**: Event consumption from `search-moderation-events` queue
 - **video-service**: HTTP client for fetching full video details on indexing
 
 ## Documentation Index
