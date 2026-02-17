@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 /**
  * SQS listener for moderation events.
  *
- * <p>Handles VideoApproved and VideoRejected events from the moderation-events SQS queue.
+ * <p>Handles VideoApproved and VideoRejected events from the search-moderation-events SQS queue.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,7 +23,7 @@ public class ModerationEventHandlers {
    *
    * @param event the moderation event (VideoApproved or VideoRejected)
    */
-  @SqsListener("${app.sqs.moderation-events-queue:moderation-events}")
+  @SqsListener("${app.sqs.search-moderation-events-queue:search-moderation-events}")
   public void handleModerationEvent(ModerationEvent event) {
     switch (event) {
       case VideoApprovedEvent approved -> handleVideoApproved(approved);
