@@ -37,7 +37,7 @@ INSERT INTO search.search_videos (
      'Utica Michigan Police Confrontation',
      'Steve Jones confronted by Detective Sergeant during First Amendment audit.',
      'Fricn Media',
-     ARRAY['FIRST', 'FOURTH']::VARCHAR[], ARRAY['POLICE']::VARCHAR[],
+     ARRAY['FIRST', 'FOURTH']::VARCHAR[], ARRAY['POLICE', 'SECURITY']::VARCHAR[],
      '20000000-0000-0000-0000-000000000004', 'Fremont City Hall', 'Fremont', 'CA',
      37.5485, -121.9886),
 
@@ -45,7 +45,7 @@ INSERT INTO search.search_videos (
      'Pocahontas City Hall Audit',
      'First Amendment audit at Pocahontas, Arkansas city hall.',
      'The Random Patriot',
-     ARRAY['FIRST']::VARCHAR[], ARRAY['GOVERNMENT']::VARCHAR[],
+     ARRAY['FIRST']::VARCHAR[], ARRAY['GOVERNMENT', 'CITIZEN']::VARCHAR[],
      '20000000-0000-0000-0000-000000000005', 'Berkeley Post Office', 'Berkeley', 'CA',
      37.8716, -122.2727),
 
