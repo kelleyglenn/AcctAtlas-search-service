@@ -133,7 +133,7 @@ $$ LANGUAGE plpgsql;
 |-----------|------|-------------|
 | q | String | Search query text |
 | amendments | String[] | Filter by amendments (e.g., FIRST, FOURTH) |
-| participants | String[] | Filter by participants (e.g., POLICE, CITIZEN) |
+| participants | String[] | Filter by participants (e.g., POLICE, SECURITY) |
 | state | String | Filter by US state |
 | page | Int | Page number (0-indexed) |
 | size | Int | Page size (default: 20, max: 100) |
@@ -154,7 +154,7 @@ $$ LANGUAGE plpgsql;
       "channelName": "Channel Name",
       "videoDate": "2024-01-15",
       "amendments": ["FIRST", "FOURTH"],
-      "participants": ["POLICE", "CITIZEN"],
+      "participants": ["POLICE", "SECURITY"],
       "locations": [
         {
           "id": "uuid",

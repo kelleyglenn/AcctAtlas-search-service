@@ -67,7 +67,7 @@ paths:
             type: array
             items:
               type: string
-              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN]
+              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN, SECURITY]
           style: form
           explode: true
           description: Filter by participant types
@@ -204,7 +204,7 @@ paths:
             type: array
             items:
               type: string
-              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN]
+              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN, SECURITY]
           style: form
           explode: true
         - name: state
@@ -268,7 +268,7 @@ components:
           type: array
           items:
             type: string
-            enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN]
+            enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN, SECURITY]
         locations:
           type: array
           items:
@@ -350,6 +350,7 @@ components:
               GOVERNMENT: 800
               CITIZEN: 1500
               BUSINESS: 200
+              SECURITY: 150
         states:
           type: object
           additionalProperties:
