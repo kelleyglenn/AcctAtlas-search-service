@@ -136,6 +136,64 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /search/cluster:
+    get:
+      operationId: getVideoClusters
+      summary: Get clustered video counts for map display
+      description: |
+        Returns grid-based clusters of videos within a bounding box.
+        Supports the same amendment/participant filters as the search endpoint.
+        Cluster counts represent video counts (not location counts).
+        Grid cell size is determined by zoom level: cellSize = 180 / 2^zoom.
+      tags: [Search]
+      security: []
+      parameters:
+        - name: bbox
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^-?\\d+\\.?\\d*,-?\\d+\\.?\\d*,-?\\d+\\.?\\d*,-?\\d+\\.?\\d*$"
+          description: "Bounding box: minLng,minLat,maxLng,maxLat"
+          example: "-125,24,-66,50"
+        - name: zoom
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+          description: Map zoom level (determines cluster grid size)
+        - name: amendments
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [FIRST, SECOND, FOURTH, FIFTH]
+          style: form
+          explode: true
+          description: Filter by amendments (OR logic within)
+        - name: participants
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [POLICE, GOVERNMENT, BUSINESS, CITIZEN, SECURITY]
+          style: form
+          explode: true
+          description: Filter by participant types
+      responses:
+        '200':
+          description: Clustered video counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   /search/suggest:
     get:
       operationId: getSuggestions
@@ -459,6 +517,55 @@ components:
         totalMatching:
           type: integer
           description: Total documents matching current filters
+
+    ClusterResponse:
+      type: object
+      required: [clusters, totalLocations, zoom]
+      properties:
+        clusters:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarkerCluster'
+        totalLocations:
+          type: integer
+          minimum: 0
+          description: Sum of all cluster counts
+        zoom:
+          type: integer
+          description: Echo of the requested zoom level
+
+    MarkerCluster:
+      type: object
+      required: [id, coordinates, count, bounds]
+      properties:
+        id:
+          type: string
+          description: "Deterministic cluster ID: cluster_{zoom}_{latCell}_{lngCell}"
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        count:
+          type: integer
+          minimum: 1
+          description: Number of videos in this cluster
+        bounds:
+          $ref: '#/components/schemas/ClusterBounds'
+
+    ClusterBounds:
+      type: object
+      required: [minLat, maxLat, minLng, maxLng]
+      properties:
+        minLat:
+          type: number
+          format: double
+        maxLat:
+          type: number
+          format: double
+        minLng:
+          type: number
+          format: double
+        maxLng:
+          type: number
+          format: double
 
     # Error schemas
     Error:

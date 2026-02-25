@@ -242,6 +242,99 @@ class SearchIntegrationTest {
     mockMvc.perform(get("/search").param("bbox", "invalid")).andExpect(status().isBadRequest());
   }
 
+  // --- Cluster endpoint tests ---
+
+  @Test
+  void cluster_returnsVideosGroupedByProximity() throws Exception {
+    // Two videos near SF, one near LA
+    SearchVideo sf1 = createVideoWithLocation("SF Video 1", "Description", 37.7749, -122.4194);
+    SearchVideo sf2 = createVideoWithLocation("SF Video 2", "Description", 37.7850, -122.4094);
+    SearchVideo la = createVideoWithLocation("LA Video", "Description", 34.0522, -118.2437);
+    searchVideoRepository.saveAll(java.util.List.of(sf1, sf2, la));
+
+    mockMvc
+        .perform(get("/search/cluster").param("bbox", "-125,24,-66,50").param("zoom", "7"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.clusters").isArray())
+        .andExpect(jsonPath("$.totalLocations").value(3))
+        .andExpect(jsonPath("$.zoom").value(7));
+  }
+
+  @Test
+  void cluster_withAmendmentFilter_excludesNonMatchingVideos() throws Exception {
+    SearchVideo firstAmendment =
+        createVideoWithLocationAndAmendments("1A Video", 37.7749, -122.4194, "FIRST");
+    SearchVideo fourthAmendment =
+        createVideoWithLocationAndAmendments("4A Video", 37.7850, -122.4094, "FOURTH");
+    searchVideoRepository.saveAll(java.util.List.of(firstAmendment, fourthAmendment));
+
+    mockMvc
+        .perform(
+            get("/search/cluster")
+                .param("bbox", "-125,24,-66,50")
+                .param("zoom", "5")
+                .param("amendments", "FIRST"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalLocations").value(1));
+  }
+
+  @Test
+  void cluster_withParticipantFilter_excludesNonMatchingVideos() throws Exception {
+    SearchVideo policeVideo =
+        createVideoWithLocationAndParticipants("Police Video", 37.7749, -122.4194, "POLICE");
+    SearchVideo govVideo =
+        createVideoWithLocationAndParticipants("Gov Video", 37.7850, -122.4094, "GOVERNMENT");
+    searchVideoRepository.saveAll(java.util.List.of(policeVideo, govVideo));
+
+    mockMvc
+        .perform(
+            get("/search/cluster")
+                .param("bbox", "-125,24,-66,50")
+                .param("zoom", "5")
+                .param("participants", "POLICE"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalLocations").value(1));
+  }
+
+  @Test
+  void cluster_withNoVideosInBbox_returnsEmptyArray() throws Exception {
+    SearchVideo video = createVideoWithLocation("SF Video", "Description", 37.7749, -122.4194);
+    searchVideoRepository.save(video);
+
+    // Middle of Pacific Ocean
+    mockMvc
+        .perform(get("/search/cluster").param("bbox", "170,10,175,15").param("zoom", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.clusters").isArray())
+        .andExpect(jsonPath("$.clusters").isEmpty())
+        .andExpect(jsonPath("$.totalLocations").value(0));
+  }
+
+  @Test
+  void cluster_withInvalidBbox_returns400() throws Exception {
+    mockMvc
+        .perform(get("/search/cluster").param("bbox", "invalid").param("zoom", "5"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void cluster_clusterHasExpectedFields() throws Exception {
+    SearchVideo video = createVideoWithLocation("SF Video", "Description", 37.7749, -122.4194);
+    searchVideoRepository.save(video);
+
+    mockMvc
+        .perform(get("/search/cluster").param("bbox", "-125,24,-66,50").param("zoom", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.clusters[0].id").isString())
+        .andExpect(jsonPath("$.clusters[0].coordinates.latitude").isNumber())
+        .andExpect(jsonPath("$.clusters[0].coordinates.longitude").isNumber())
+        .andExpect(jsonPath("$.clusters[0].count").isNumber())
+        .andExpect(jsonPath("$.clusters[0].bounds.minLat").isNumber())
+        .andExpect(jsonPath("$.clusters[0].bounds.maxLat").isNumber())
+        .andExpect(jsonPath("$.clusters[0].bounds.minLng").isNumber())
+        .andExpect(jsonPath("$.clusters[0].bounds.maxLng").isNumber());
+  }
+
   @Test
   void actuatorHealth_isAccessible() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
@@ -266,6 +359,22 @@ class SearchIntegrationTest {
   private SearchVideo createVideoWithLocation(
       String title, String description, double lat, double lng) {
     SearchVideo video = createVideo(title, description, new String[] {}, new String[] {}, null);
+    video.setPrimaryLocationLat(lat);
+    video.setPrimaryLocationLng(lng);
+    return video;
+  }
+
+  private SearchVideo createVideoWithLocationAndAmendments(
+      String title, double lat, double lng, String... amendments) {
+    SearchVideo video = createVideo(title, "Description", amendments, new String[] {}, null);
+    video.setPrimaryLocationLat(lat);
+    video.setPrimaryLocationLng(lng);
+    return video;
+  }
+
+  private SearchVideo createVideoWithLocationAndParticipants(
+      String title, double lat, double lng, String... participants) {
+    SearchVideo video = createVideo(title, "Description", new String[] {}, participants, null);
     video.setPrimaryLocationLat(lat);
     video.setPrimaryLocationLng(lng);
     return video;
