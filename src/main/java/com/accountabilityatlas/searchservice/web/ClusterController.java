@@ -19,7 +19,7 @@ public class ClusterController {
   private final ClusterService clusterService;
 
   @GetMapping("/cluster")
-  public ResponseEntity<?> getClusters(
+  public ResponseEntity<Object> getClusters(
       @RequestParam String bbox,
       @RequestParam int zoom,
       @RequestParam(required = false) Set<String> amendments,

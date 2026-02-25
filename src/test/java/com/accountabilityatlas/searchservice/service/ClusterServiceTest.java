@@ -26,7 +26,8 @@ class ClusterServiceTest {
   @InjectMocks private ClusterService clusterService;
 
   @Test
-  void findClusters_calculatesCorrectCellSizeForZoom3() {
+  void findClusters_withZoom3_calculatesCellSizeOf22Point5() {
+    // Arrange
     when(searchVideoRepository.findClustersInBoundingBox(
             anyDouble(),
             anyDouble(),
@@ -37,16 +38,18 @@ class ClusterServiceTest {
             anyString()))
         .thenReturn(List.of());
 
-    // cellSize = 180.0 / pow(2, 3) = 180.0 / 8 = 22.5
+    // Act
     clusterService.findClusters(24, 50, -125, -66, 3, Set.of("FIRST"), Set.of("POLICE"));
 
+    // Assert — cellSize = 180.0 / pow(2, 3) = 180.0 / 8 = 22.5
     verify(searchVideoRepository)
         .findClustersInBoundingBox(
             eq(24.0), eq(50.0), eq(-125.0), eq(-66.0), eq(22.5), anyString(), anyString());
   }
 
   @Test
-  void findClusters_calculatesCorrectCellSizeForZoom8() {
+  void findClusters_withZoom8_calculatesCellSizeOf0Point703125() {
+    // Arrange
     when(searchVideoRepository.findClustersInBoundingBox(
             anyDouble(),
             anyDouble(),
@@ -57,22 +60,26 @@ class ClusterServiceTest {
             anyString()))
         .thenReturn(List.of());
 
-    // cellSize = 180.0 / pow(2, 8) = 180.0 / 256 = 0.703125
+    // Act
     clusterService.findClusters(24, 50, -125, -66, 8, Set.of("FIRST"), Set.of("POLICE"));
 
+    // Assert — cellSize = 180.0 / pow(2, 8) = 180.0 / 256 = 0.703125
     verify(searchVideoRepository)
         .findClustersInBoundingBox(
             eq(24.0), eq(50.0), eq(-125.0), eq(-66.0), eq(0.703125), anyString(), anyString());
   }
 
   @Test
-  void findClusters_validatesAmendments() {
+  void findClusters_withInvalidAmendment_filtersToOnlyValidValues() {
+    // Arrange
     when(searchVideoRepository.findClustersInBoundingBox(
             anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString(), isNull()))
         .thenReturn(List.of());
 
+    // Act
     clusterService.findClusters(24, 50, -125, -66, 5, Set.of("FIRST", "INVALID"), null);
 
+    // Assert
     verify(searchVideoRepository)
         .findClustersInBoundingBox(
             anyDouble(),
@@ -85,13 +92,16 @@ class ClusterServiceTest {
   }
 
   @Test
-  void findClusters_validatesParticipants() {
+  void findClusters_withInvalidParticipant_filtersToOnlyValidValues() {
+    // Arrange
     when(searchVideoRepository.findClustersInBoundingBox(
             anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), isNull(), anyString()))
         .thenReturn(List.of());
 
+    // Act
     clusterService.findClusters(24, 50, -125, -66, 5, null, Set.of("POLICE", "INVALID"));
 
+    // Assert
     verify(searchVideoRepository)
         .findClustersInBoundingBox(
             anyDouble(),
@@ -104,20 +114,24 @@ class ClusterServiceTest {
   }
 
   @Test
-  void findClusters_nullFiltersPassedAsNull() {
+  void findClusters_withNullFilters_passesNullToRepository() {
+    // Arrange
     when(searchVideoRepository.findClustersInBoundingBox(
             anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), isNull(), isNull()))
         .thenReturn(List.of());
 
+    // Act
     clusterService.findClusters(24, 50, -125, -66, 5, null, null);
 
+    // Assert
     verify(searchVideoRepository)
         .findClustersInBoundingBox(
             anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), isNull(), isNull());
   }
 
   @Test
-  void findClusters_convertsRawResultsToDtos() {
+  void findClusters_withQueryResults_convertsRawRowsToDtos() {
+    // Arrange
     Object[] row = new Object[] {37.5, -122.0, 10L, 6L, -21L, 37.0, 38.0, -123.0, -121.0};
     List<Object[]> rows = new java.util.ArrayList<>();
     rows.add(row);
@@ -125,8 +139,10 @@ class ClusterServiceTest {
             anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), isNull(), isNull()))
         .thenReturn(rows);
 
+    // Act
     ClusterResult result = clusterService.findClusters(24, 50, -125, -66, 5, null, null);
 
+    // Assert
     assertThat(result.clusters()).hasSize(1);
     ClusterResult.Cluster cluster = result.clusters().getFirst();
     assertThat(cluster.id()).isEqualTo("cluster_5_6_-21");
@@ -140,7 +156,8 @@ class ClusterServiceTest {
   }
 
   @Test
-  void findClusters_calculatesTotalLocations() {
+  void findClusters_withMultipleClusters_sumsTotalLocations() {
+    // Arrange
     Object[] row1 = new Object[] {37.5, -122.0, 10L, 6L, -21L, 37.0, 38.0, -123.0, -121.0};
     Object[] row2 = new Object[] {34.0, -118.0, 5L, 5L, -20L, 33.5, 34.5, -118.5, -117.5};
     List<Object[]> rows = new java.util.ArrayList<>();
@@ -150,8 +167,10 @@ class ClusterServiceTest {
             anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), isNull(), isNull()))
         .thenReturn(rows);
 
+    // Act
     ClusterResult result = clusterService.findClusters(24, 50, -125, -66, 5, null, null);
 
+    // Assert
     assertThat(result.totalLocations()).isEqualTo(15);
     assertThat(result.zoom()).isEqualTo(5);
   }
